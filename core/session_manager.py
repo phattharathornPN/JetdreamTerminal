@@ -117,6 +117,8 @@ def get_by_id(session_id: int) -> Session | None:
         legacy_mode=bool(r["legacy_mode"]),
         rdp_width=r["rdp_width"],
         rdp_height=r["rdp_height"],
+        serial_port=r["serial_port"] if "serial_port" in r.keys() else "/dev/ttyUSB0",
+        baudrate=r["baudrate"] if "baudrate" in r.keys() else 9600,
         favorite=bool(r["favorite"]) if "favorite" in r.keys() else False,
         auto_save=bool(r["auto_save"]) if "auto_save" in r.keys() else False,
         vpn_realm=r["vpn_realm"] if "vpn_realm" in r.keys() else "",
