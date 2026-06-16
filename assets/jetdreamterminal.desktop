@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=JetdreamTerminal
+GenericName=Terminal Client
+Comment=MobaXterm-like terminal for Linux (SSH, Telnet, SFTP, VPN, Serial, RDP)
+Exec=/home/jetdream/HHD-Dream/JetdreamTerminal/launch.sh
+Icon=/home/jetdream/HHD-Dream/JetdreamTerminal/assets/icon.svg
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=terminal;ssh;sftp;telnet;vpn;serial;
+StartupWMClass=JetdreamTerminal
