@@ -44,6 +44,26 @@ class SftpBrowser:
             pass
         return None
 
+    def _find_private_keys(self) -> list[str]:
+        ssh_dir = os.path.expanduser("~/.ssh")
+        if not os.path.isdir(ssh_dir):
+            return []
+        candidates = []
+        for name in os.listdir(ssh_dir):
+            path = os.path.join(ssh_dir, name)
+            if not os.path.isfile(path) or name.endswith(".pub") or name.startswith("known_hosts") or name.startswith("config"):
+                continue
+            if not os.access(path, os.R_OK):
+                continue
+            try:
+                with open(path, "rb") as f:
+                    header = f.read(32)
+                if b"OPENSSH PRIVATE KEY" in header or b"RSA PRIVATE KEY" in header or b"DSA PRIVATE KEY" in header or b"EC PRIVATE KEY" in header:
+                    candidates.append(path)
+            except Exception:
+                continue
+        return candidates
+
     def connect(self, password: str = ""):
         self.disconnect()
         host = self.session.host
@@ -61,7 +81,6 @@ class SftpBrowser:
             self._transport.local_version = "SSH-2.0-OpenSSH_8.9"
 
             pkey = None
-            key_password = ""
 
             if self.session.auth_type == AuthType.KEY and self.session.key_path:
                 pkey = self._load_key(self.session.key_path)
@@ -72,8 +91,6 @@ class SftpBrowser:
                     pkey = self._load_key(self.session.key_path, password)
                     if not pkey:
                         log.warning(f"Could not load key file: {self.session.key_path}")
-                if not pkey and password:
-                    pass
 
             if pkey:
                 self._transport.connect(
@@ -86,15 +103,22 @@ class SftpBrowser:
                     password=password,
                 )
             else:
-                agent = paramiko.Agent()
-                agent_keys = agent.get_keys()
-                if agent_keys:
-                    self._transport.connect(
-                        username=self.session.username,
-                        pkey=agent_keys[0],
+                self._transport.start_client()
+                auth_ok = False
+                for key_path in self._find_private_keys():
+                    pkey = self._load_key(key_path)
+                    if pkey:
+                        try:
+                            self._transport.auth_publickey(self.session.username, pkey)
+                            auth_ok = True
+                            break
+                        except paramiko.AuthenticationException:
+                            continue
+                if not auth_ok:
+                    raise ConnectionError(
+                        f"Authentication failed — no key or password configured for this session. "
+                        f"Edit session: set key_path or password."
                     )
-                else:
-                    self._transport.connect(username=self.session.username)
 
             log.info(f"SFTP transport authenticated to {host}")
         except paramiko.AuthenticationException as e:
