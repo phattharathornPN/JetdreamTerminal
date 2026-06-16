@@ -8,6 +8,17 @@ REAL_HOME=$(eval echo "~$REAL_USER")
 
 echo "=== Installing JetdreamTerminal ==="
 
+# Setup venv if missing
+if [ ! -d "$APPDIR/.venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv "$APPDIR/.venv"
+fi
+source "$APPDIR/.venv/bin/activate"
+
+# Install Python dependencies
+echo "Installing Python packages..."
+pip install -q -r "$APPDIR/requirements.txt"
+
 # Make launch script executable
 chmod +x "$APPDIR/launch.sh"
 
