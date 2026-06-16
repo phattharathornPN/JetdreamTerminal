@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QColor
-from models.session import Session
+from models.session import Session, AuthType
 from core.sftp_browser import SftpBrowser
 from core.crypto import decrypt
 from utils.logger import log
@@ -120,11 +120,12 @@ class SftpPanel(QWidget):
 
     def connect_sftp(self):
         password = ""
-        if self.session.password_encrypted:
-            try:
-                password = decrypt(self.session.password_encrypted)
-            except Exception:
-                pass
+        if self.session.auth_type in (AuthType.PASSWORD, AuthType.KEY_WITH_PASSWORD):
+            if self.session.password_encrypted:
+                try:
+                    password = decrypt(self.session.password_encrypted)
+                except Exception:
+                    pass
         try:
             self._browser.connect(password)
             self._status.setText(f"Connected: {self.session.username}@{self.session.host}")

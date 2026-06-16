@@ -1,7 +1,7 @@
 import paramiko
 import os
 import socket
-from models.session import Session
+from models.session import Session, AuthType
 from core.crypto import decrypt
 from core.ssh_client import _is_windows_host
 from utils.logger import log
@@ -17,6 +17,27 @@ class SftpBrowser:
     @property
     def connected(self) -> bool:
         return self._sftp is not None
+
+    def _load_key(self, key_path: str, password: str = ""):
+        if not key_path or not os.path.exists(key_path):
+            return None
+        try:
+            return paramiko.Ed25519Key.from_private_key_file(key_path, password=password or None)
+        except Exception:
+            pass
+        try:
+            return paramiko.RSAKey.from_private_key_file(key_path, password=password or None)
+        except Exception:
+            pass
+        try:
+            return paramiko.ECDSAKey.from_private_key_file(key_path, password=password or None)
+        except Exception:
+            pass
+        try:
+            return paramiko.DSSKey.from_private_key_file(key_path, password=password or None)
+        except Exception:
+            pass
+        return None
 
     def connect(self, password: str = ""):
         self.disconnect()
@@ -34,7 +55,27 @@ class SftpBrowser:
             self._transport = paramiko.Transport(sock)
             self._transport.local_version = "SSH-2.0-OpenSSH_8.9"
 
-            if password:
+            pkey = None
+            key_password = ""
+
+            if self.session.auth_type == AuthType.KEY and self.session.key_path:
+                pkey = self._load_key(self.session.key_path)
+                if not pkey:
+                    log.warning(f"Could not load key file: {self.session.key_path}")
+            elif self.session.auth_type == AuthType.KEY_WITH_PASSWORD:
+                if self.session.key_path:
+                    pkey = self._load_key(self.session.key_path, password)
+                    if not pkey:
+                        log.warning(f"Could not load key file: {self.session.key_path}")
+                if not pkey and password:
+                    pass
+
+            if pkey:
+                self._transport.connect(
+                    username=self.session.username,
+                    pkey=pkey,
+                )
+            elif password:
                 self._transport.connect(
                     username=self.session.username,
                     password=password,
