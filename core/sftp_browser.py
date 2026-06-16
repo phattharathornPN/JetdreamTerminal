@@ -18,23 +18,28 @@ class SftpBrowser:
     def connected(self) -> bool:
         return self._sftp is not None
 
+    def _resolve_key_path(self, key_path: str) -> str:
+        if not key_path:
+            return ""
+        if key_path.endswith(".pub"):
+            candidate = key_path[:-4]
+            if os.path.exists(candidate):
+                return candidate
+        if os.path.exists(key_path):
+            return key_path
+        return key_path
+
     def _load_key(self, key_path: str, password: str = ""):
-        if not key_path or not os.path.exists(key_path):
+        resolved = self._resolve_key_path(key_path)
+        if not resolved or not os.path.exists(resolved):
             return None
+        for cls in (paramiko.Ed25519Key, paramiko.RSAKey, paramiko.ECDSAKey):
+            try:
+                return cls.from_private_key_file(resolved, password=password or None)
+            except Exception:
+                pass
         try:
-            return paramiko.Ed25519Key.from_private_key_file(key_path, password=password or None)
-        except Exception:
-            pass
-        try:
-            return paramiko.RSAKey.from_private_key_file(key_path, password=password or None)
-        except Exception:
-            pass
-        try:
-            return paramiko.ECDSAKey.from_private_key_file(key_path, password=password or None)
-        except Exception:
-            pass
-        try:
-            return paramiko.DSSKey.from_private_key_file(key_path, password=password or None)
+            return paramiko.DSSKey.from_private_key_file(resolved, password=password or None)
         except Exception:
             pass
         return None
