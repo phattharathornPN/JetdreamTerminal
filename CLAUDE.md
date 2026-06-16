@@ -1,20 +1,22 @@
 # JetdreamTerminal — MobaXterm Clone for Linux
 
-## 🎯 Mission
+## Mission
 
 สร้าง terminal client บน Linux ที่ทำหน้าที่เหมือน MobaXterm บน Windows
-- **Shell** (local bash/zsh/fish — ปุ่ม Shell)
+- **Shell** (local bash/zsh/fish)
 - **SSH** (standard + legacy mode สำหรับ Cisco/Aruba/older devices)
 - **Telnet** (console server, legacy network devices)
 - **RDP** (xfreerdp subprocess)
 - **SFTP** (file browser panel + inline ใน SSH tab)
 - **Serial** (console cable / USB-to-Serial adapter)
+- **VPN** (openfortivpn)
+- **VNC** (vncviewer/remmina)
 
 **Legacy device support สำคัญมาก:** Cisco 2960X, 3750, ASA 5500, Aruba switches
 
 ---
 
-## 🔑 Tech Stack
+## Tech Stack
 
 | Layer | Library | Purpose |
 |---|---|---|
@@ -26,51 +28,52 @@
 | Serial | pyserial | USB-to-Serial adapter |
 | Crypto | cryptography (Fernet) | Encrypt stored passwords |
 | RDP | xfreerdp (system) | subprocess wrapper |
-| Telnet | telnetlib / subprocess | Legacy device access |
+| VNC | vncviewer/remmina (system) | subprocess wrapper |
+| VPN | openfortivpn (system) | subprocess wrapper |
 | Storage | SQLite | Session persistence |
 | Local shell | bash/zsh/fish | Shell mode |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 JetdreamTerminal/
-├── CLAUDE.md                 ← ไฟล์นี้
+├── CLAUDE.md
+├── AGENTS.md
 ├── requirements.txt
 ├── main.py                   ← Entry point
 ├── core/
-│   ├── __init__.py
 │   ├── pty_manager.py        ← PTY fork, QSocketNotifier, resize
-│   ├── ssh_client.py         ← SSH command builder (standard + legacy)
-│   ├── telnet_client.py      ← Telnet connection + PTY wrapper
+│   ├── ssh_client.py         ← SSH command builder (standard + legacy + Windows detect)
 │   ├── rdp_client.py         ← xfreerdp subprocess wrapper
+│   ├── vnc_client.py         ← vncviewer/remmina subprocess wrapper
 │   ├── serial_client.py      ← pyserial + QTimer polling
-│   ├── sftp_browser.py       ← paramiko Transport SFTP
+│   ├── sftp_browser.py       ← paramiko Transport SFTP (Windows path support)
 │   ├── crypto.py             ← Fernet encrypt/decrypt
 │   ├── session_manager.py    ← SQLite CRUD
 │   └── host_key.py           ← ssh-keyscan + TOFU
 ├── ui/
-│   ├── __init__.py
 │   ├── main_window.py        ← MainWindow, sidebar, tabs, menus
 │   ├── terminal_widget.py    ← pyte + QPainter + scroll + selection + bg image
-│   ├── session_dialog.py     ← New/Edit session (with required field styling)
+│   ├── session_dialog.py     ← New/Edit session (SSH/Telnet/RDP/SFTP/Serial/VPN/VNC)
 │   ├── ssh_tab.py            ← SSH tab with SFTP panel toggle
 │   ├── telnet_tab.py         ← Telnet tab
-│   ├── rdp_tab.py            ← RDP tab (xfreerdp embed)
+│   ├── rdp_tab.py            ← RDP tab (xfreerdp)
+│   ├── vnc_tab.py            ← VNC tab (host + port only)
 │   ├── serial_tab.py         ← Serial tab with port/baud selector
 │   ├── shell_tab.py          ← Local shell tab
 │   ├── sftp_tab.py           ← SFTP standalone tab
-│   ├── sftp_panel.py         ← SFTP file browser panel
+│   ├── sftp_panel.py         ← SFTP file browser panel (Windows path support)
+│   ├── vpn_tab.py            ← VPN tab (openfortivpn)
 │   ├── host_key_dialog.py    ← Host key TOFU dialog
 │   ├── keygen_dialog.py      ← SSH Key Generator (with sshpass)
 │   ├── settings_dialog.py    ← Settings: bg image, theme, opacity
+│   ├── highlight.py          ← Regex syntax highlighting
 │   └── theme.py              ← Nord dark theme + terminal themes + QSS
 ├── models/
-│   ├── __init__.py
-│   └── session.py            ← Session dataclass + enums
+│   └── session.py            ← Session dataclass + enums (SSH/Telnet/RDP/SFTP/Serial/Shell/VPN/VNC)
 └── utils/
-    ├── __init__.py
     ├── db.py                 ← SQLite connection + schema
     ├── config.py             ← paths + config load/save
     └── logger.py             ← file + console logging
@@ -78,7 +81,7 @@ JetdreamTerminal/
 
 ---
 
-## 🗃️ Session Model
+## Session Model
 
 ```python
 class SessionType(Enum):
@@ -88,6 +91,8 @@ class SessionType(Enum):
     SFTP = "sftp"
     SERIAL = "serial"
     SHELL = "shell"
+    VPN = "vpn"
+    VNC = "vnc"
 
 class AuthType(Enum):
     PASSWORD = "password"
@@ -114,14 +119,20 @@ class Session:
     rdp_height:         int = 1080
     serial_port:        str = "/dev/ttyUSB0"
     baudrate:           int = 9600
+    favorite:           bool = False
+    auto_save:          bool = False
+    vpn_realm:          str = ""
+    vpn_trusted_cert:   str = ""
+    vpn_ignore_cert:    bool = False
+    vnc_port:           int = 5901
 ```
 
 ---
 
-## 🔄 Connection Flows
+## Connection Flows
 
 ### Shell (Local Terminal)
-1. กดปุ่ม **⬛ Shell** → เปิด bash/zsh/fish ทันที
+1. กดปุ่ม **Shell** → เปิด bash/zsh/fish ทันที
 2. ไม่ต้องกรอก host/port/auth
 3. ใช้ `$SHELL` environment variable
 
@@ -130,129 +141,54 @@ class Session:
 2. Create `SSHTab(session)` → host key check (TOFU)
 3. `PtyManager.launch(["ssh", user@host, ...], env)`
 4. Password auto-login: `sshpass -e` + `SSHPASS` env var
-5. SFTP panel: กดปุ่ม **📁 SFTP** ใน SSH tab เพื่อเปิด file browser
+5. SFTP panel: กดปุ่ม **SFTP** ใน SSH tab เพื่อเปิด file browser
 
 ### SSH (Legacy — Cisco 2960X / Aruba)
-1. Same flow but with extra `-o` flags:
-   ```
-   -o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
-   -o HostKeyAlgorithms=+ssh-rsa,ssh-dss
-   -o Ciphers=+aes128-cbc,3des-cbc
-   -o MACs=+hmac-md5,hmac-sha1
-   ```
+Same flow but with extra `-o` flags:
+```
+-o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
+-o HostKeyAlgorithms=+ssh-rsa,ssh-dss
+-o Ciphers=+aes128-cbc,3des-cbc
+-o MACs=+hmac-md5,hmac-sha1
+```
+
+### SSH (Windows)
+Same flow but with extra options:
+```
+-o RequestTTY=yes
+-o SendEnv=TERM LANG
+```
+Terminal sets `TERM=xterm-256color`.
 
 ### Telnet
-1. `PtyManager.launch(["telnet", host, port])`
+`PtyManager.launch(["telnet", host, port])`
 
 ### Serial (Console Cable)
 1. Auto-detect USB-to-Serial ports (`/dev/ttyUSB0`, `/dev/ttyACM0`)
 2. `SerialManager.connect(port, baudrate)` ผ่าน pyserial
-3. Toolbar เล็ก: Port combo + Baudrate + Connect/Disconnect
-4. ใช้ `sshpass` สำหรับ auth
+3. Toolbar: Port combo + Baudrate + Connect/Disconnect
 
 ### RDP
-1. `subprocess.Popen(["xfreerdp", f"/v:{host}", f"/u:{user}", ...])`
+`subprocess.Popen(["xfreerdp", f"/v:{host}", f"/u:{user}", ...])`
+
+### VNC
+1. User enters host + port in VNC tab
+2. `VncClient.launch()` finds vncviewer/remmina
+3. TigerVNC uses `host::port` (double colon) for explicit port
+4. Password file uses binary XOR encoding (8 bytes)
 
 ### SFTP (paramiko Transport)
 1. ใช้ `paramiko.Transport` ตรง (ไม่ผ่าน SSHClient)
 2. `socket.create_connection()` → `Transport.connect()` → `SFTPClient.from_transport()`
 3. แก้ปัญหา "No existing session" ของ paramiko 5.0.0
+4. Windows: `_resolve_path()` ใช้ `%USERPROFILE%` แทน `$HOME`
+
+### VPN
+`sudo -S openfortivpn host:port -u user -r realm --trusted-cert hash`
 
 ---
 
-## 🖥️ UI Layout
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Menu: File | Sessions | Tools(⚙Settings) | Help     │
-├─────────────────┬────────────────────────────────────┤
-│  🔍 Sessions    │  [SSH: srv1] [Serial: sw1] [+]     │
-│                 ├────────────────────────────────────┤
-│  Session        │  [📁 SFTP toggle]                   │
-│  Sidebar        ├────────────────────────────────────┤
-│                 │                                    │
-│  ▼ Work         │   Terminal / SFTP / RDP            │
-│    server1      │                                    │
-│    cisco-sw1    │   Scrollback 5000+ lines           │
-│  ▼ Network      │   Mouse selection + auto-copy      │
-│    2960X-sw     │   Right-click: Copy/Paste/Theme    │
-│                 ├────────────────────────────────────┤
-│  [+ New Session]│  Status bar                        │
-│  [⬛ Shell]     │                                    │
-│  [🔑 Key Gen]   │                                    │
-└─────────────────┴────────────────────────────────────┘
-```
-
----
-
-## 🎨 Terminal Features
-
-### Scrollback
-- ใช้ pyte Screen ขนาดใหญ่ (vis_rows + 5000)
-- Mouse wheel: scroll 3 บรรทัด
-- PageUp/PageDown: scroll ทีละหน้าจอ
-- Scrollbar ด้านขวา + indicator "↑ X lines"
-- Auto-scroll กลับเมื่อกด key หรือมีข้อมูลใหม่
-
-### Unicode & Thai Text Support
-- **ThaiScreen** (subclass `pyte.Screen`): override `draw()` เพื่อจัดการ combining characters
-  - สระ/วรรณยุกต์ไทย (Unicode category "M") ถูก merge เข้า cell ก่อนหน้า ไม่ put ใน cell ใหม่
-  - ใช้ `Char._replace(data=...)` ของ pyte namedtuple
-- **Byte buffer**: `_byte_buffer` accumulates partial UTF-8 sequences ก่อน decode
-- เปลี่ยนจาก `pyte.ByteStream` → `pyte.Stream` (text mode) + manual decode
-- `unicodedata.category()` ใช้เช็ค combining marks (category "Mn", "Mc", "Me")
-
-### Shift+Tab (Backtab)
-- Qt6 แปลง Shift+Tab เป็น `Key_Backtab` อัตโนมัติ (ไม่ใช่ Key_Tab + ShiftModifier)
-- ส่ง escape sequence `\x1b[Z` เข้า PTY ให้ app ใน terminal จัดการ
-- ใช้สำหรับเปลี่ยน Mode ใน AI tools เช่น Claude Code / MiMoCode
-
-### Copy/Paste
-- **ลากเมาส์เลือก** → ปล่อย auto-copy → toast "Copied X line(s)"
-- **Ctrl+Shift+C** = Copy (selection หรือทั้งหน้า)
-- **Ctrl+Shift+V** = Paste
-- **Ctrl+C** = SIGINT (ไม่ใช่ copy)
-- **Ctrl+A/E/K/U/W/L/R** = readline shortcuts
-
-### Background Image
-- **Ctrl+,** หรือ Tools → Settings → Browse เลือกรูป
-- แสดงตลอดแม้ยังไม่ connect
-- Opacity slider 10%-100%
-- 保存 ลง config.ini ถาวร
-
-### Terminal Themes
-- 11 themes: Nord, Dracula, Monokai, Solarized, Gruvbox, One Dark, Catppuccin, Tokyo Night, White, Black
-- เปลี่ยนผ่าน Settings dialog
-
-### Session Dialog
-- **Required fields**: border สีแดง `#bf616a` + `*` label
-- **Optional fields**: border สีเทา `#4c566a`
-- Auto-detect serial ports พร้อม description
-- SSH default auth = Key + Password
-
-### SSH Key Generator
-- ใช้ `sshpass` สำหรับ push key (ssh-copy-id)
-- แสดง password field เมื่อ push key
-- Key file = optional (SSH ใช้ default key อัตโนมัติ)
-
----
-
-## 🔧 Serial Console
-
-### Session Dialog
-- Type: Serial
-- Auto-detect USB-to-Serial ports (`/dev/ttyUSB0`, `/dev/ttyACM0`)
-- Port combo + Refresh button + Baudrate selector
-- แสดง port description เช่น "USB Serial", "FTDI"
-
-### Serial Tab
-- Toolbar เล็ก 32px: Port + Baud + Connect/Disconnect
-- Auto-connect เมื่อเปิด tab
-- Auto-focus terminal หลัง connect
-
----
-
-## ⚙️ Config Paths
+## Config Paths
 
 | File | Path |
 |---|---|
@@ -262,37 +198,13 @@ class Session:
 | Logs | `~/.local/share/jetdreamterminal/app.log` |
 | Known hosts | `~/.ssh/known_hosts` |
 
-### Config Sections
-```ini
-[terminal]
-theme = Nord
-bg_image = /path/to/image.png
-opacity = 0.85
-```
-
 ---
 
-## 🚀 Quick Start
+## Known Issues
 
-```bash
-cd /home/jetdream/HHD-Dream/JetdreamTerminal
-
-python3 -m venv .venv
-source .venv/bin/activate
-
-pip install PyQt6 paramiko cryptography pyte pyserial
-
-sudo apt install libxcb-cursor0 sshpass freerdp2-x11
-
-python3 main.py
-```
-
----
-
-## 📋 Known Issues / Notes
-
-- SFTP: ใช้ `paramiko.Transport` ตรง (ไม่ใช้ SSHClient) เพราะ paramiko 5.0.0 มีปัญหา "No existing session"
-- DB migration: เพิ่ม `serial_port`, `baudrate` columns อัตโนมัติ
+- SFTP ใช้ `paramiko.Transport` ตรง (ไม่ใช้ SSHClient) เพราะ paramiko 5.0.0 มีปัญหา "No existing session"
+- DB migration: เพิ่ม columns อัตโนมัติ — ดู `utils/db.py:init_db()`
 - Session type เดิม "console" → migrate เป็น "serial"
 - Legacy SSH mode สำคัญมากสำหรับ work ที่ DataCom
 - Key file = optional เพราะ SSH ใช้ default key หลัง ssh-copy-id แล้ว
+- VNC password file ต้องเป็น binary format (XOR) ไม่ใช่ plain text
