@@ -35,9 +35,9 @@ gtk-update-icon-cache "$REAL_HOME/.local/share/icons/hicolor/" 2>/dev/null || tr
 echo "✓ Icon installed"
 
 # Create symlink for easy launch
-sudo ln -sf "$APPDIR/launch.sh" /usr/local/bin/jetdreamterminal 2>/dev/null || \
-    ln -sf "$APPDIR/launch.sh" "$REAL_HOME/bin/jetdreamterminal" 2>/dev/null || \
+ln -sf "$APPDIR/launch.sh" "$REAL_HOME/bin/jetdreamterminal" 2>/dev/null || \
     echo "⚠ Could not create symlink (create ~/bin/ manually if needed)"
+sudo ln -sf "$APPDIR/launch.sh" /usr/local/bin/jetdreamterminal 2>/dev/null || true
 
 # Create desktop shortcut
 mkdir -p "$REAL_HOME/Desktop"
