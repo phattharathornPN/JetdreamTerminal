@@ -56,7 +56,27 @@ sudo apt install libxcb-cursor0 sshpass freerdp2-x11
 
 ## Installation
 
-### Quick Start
+### Prerequisites
+
+```bash
+sudo apt install python3-venv libxcb-cursor0 sshpass freerdp2-x11
+```
+
+### Install as Application (Recommended)
+
+```bash
+git clone https://github.com/phattharathornPN/JetdreamTerminal.git
+cd JetdreamTerminal
+sudo ./install.sh
+```
+
+`install.sh` จะ:
+- สร้าง virtual environment + ติดตั้ง Python packages อัตโนมัติ
+- ติดตั้ง desktop entry + icon ใน Applications menu
+- สร้าง shortcut บน Desktop
+- สร้าง symlink ไปที่ `/usr/local/bin/jetdreamterminal`
+
+### Run directly (without install)
 
 ```bash
 git clone https://github.com/phattharathornPN/JetdreamTerminal.git
@@ -69,19 +89,15 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
-### Install as Application
-
-```bash
-./install.sh
-```
-
-จะติดตั้ง desktop entry + icon + symlink ไปที่ `/usr/local/bin/jetdreamterminal`
-
 ## Usage
 
 ### Run
 
 ```bash
+# If installed via install.sh
+jetdreamterminal
+
+# Or run directly
 ./launch.sh
 ```
 
