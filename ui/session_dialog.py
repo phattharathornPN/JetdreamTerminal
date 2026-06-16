@@ -231,7 +231,8 @@ class SessionDialog(QDialog):
         self._key_widget.setEnabled(not is_rdp)
 
         default_ports = {0: "22", 1: "23", 2: "3389", 3: "22", 4: "0", 5: "443", 6: "5901"}
-        self._port.setText(default_ports.get(idx, "22"))
+        if not self._is_edit:
+            self._port.setText(default_ports.get(idx, "22"))
 
         for w in (self._name, self._host, self._port, self._username, self._password):
             w.setStyleSheet("")
@@ -348,7 +349,7 @@ class SessionDialog(QDialog):
         pw = self._password.text()
         if pw:
             self.session.password_encrypted = encrypt(pw)
-        elif not self._is_edit:
+        else:
             self.session.password_encrypted = b""
 
         session_id = save(self.session)
