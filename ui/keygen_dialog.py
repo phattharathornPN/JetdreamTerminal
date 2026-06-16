@@ -115,6 +115,14 @@ class KeygenDialog(QDialog):
         comment = self._key_comment.text().strip()
         key_file = self._key_file.text().strip() or os.path.expanduser(f"~/.ssh/id_{key_type}")
 
+        if ":" in key_file or "*" in key_file or "?" in key_file:
+            QMessageBox.warning(
+                self, "Invalid filename",
+                "Key filename cannot contain : * ?\n\n"
+                "These characters break ssh-copy-id and SSH."
+            )
+            return
+
         if os.path.exists(key_file):
             reply = QMessageBox.question(
                 self, "Overwrite?",
@@ -158,7 +166,11 @@ class KeygenDialog(QDialog):
         cmd = ["ssh-copy-id"]
         if key:
             cmd += ["-i", key]
-        cmd.append(f"{user}@{host}")
+        cmd += [
+            "-o", "PreferredAuthentications=password,keyboard-interactive",
+            "-o", "PubkeyAuthentication=no",
+            f"{user}@{host}",
+        ]
 
         if password:
             cmd = ["sshpass", "-p", password] + cmd
