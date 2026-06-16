@@ -21,7 +21,7 @@
 | Layer | Library | Purpose |
 |---|---|---|
 | GUI | PyQt6 | Main window, tabs, dialogs |
-| Terminal emulation | pyte | ANSI/VT100 → screen buffer (large buffer 5000+ rows) |
+| Terminal emulation | pyte | ANSI/VT100 → screen buffer (large buffer 5000+ rows). ThaiScreen overrides set_mode/reset_mode for alternate screen (DECSET 1049) — pyte 0.8.2 doesn't handle this. |
 | PTY | python-pty (stdlib) | Fork shell/ssh/telnet ใน pseudoterminal |
 | Async read | QSocketNotifier | non-blocking read master_fd → Qt signal |
 | SSH/SFTP | paramiko | SSH command + SFTP via Transport |
@@ -208,3 +208,4 @@ Terminal sets `TERM=xterm-256color`.
 - Legacy SSH mode สำคัญมากสำหรับ work ที่ DataCom
 - Key file = optional เพราะ SSH ใช้ default key หลัง ssh-copy-id แล้ว
 - VNC password file ต้องเป็น binary format (XOR) ไม่ใช่ plain text
+- **Alternate screen buffer**: pyte 0.8.2 ไม่รองรับ DECSET/DECRST 1049 — `ThaiScreen` override `set_mode`/`reset_mode` เพื่อ save/restore buffer + cursor ตอนเข้า/ออกจาก alternate screen. ถ้าไม่มี override นี้ `htop` และ `systemctl status` จะทำลาย scrollback buffer ตอนออกจาก program. ห้ามลบ `_saved_alt_buffer`/`_saved_alt_cursor`
