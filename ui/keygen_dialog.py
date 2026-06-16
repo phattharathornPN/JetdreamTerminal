@@ -264,16 +264,18 @@ class KeygenDialog(QDialog):
             if result.stderr:
                 self._output.append(result.stderr)
             if result.returncode == 0:
-                self._output.append(f"\n✅ Key pushed to {user}@{host}")
-                if key:
+                self._output.append(f"\n✅ Key copied to {user}@{host}")
+                self._output.append("   Verifying key works...")
+                if self._verify_key_auth(user, host, key, password):
+                    self._output.append("✅ Key authentication verified!")
                     self._fix_authorized_keys_location(user, host, password, key)
-            else:
-                stderr_lower = result.stderr.lower() if result.stderr else ""
-                if "not in PubkeyAcceptedKeyTypes" in result.stderr or "key type" in stderr_lower:
-                    self._output.append(f"\n❌ Server does not support this key type")
+                else:
+                    self._output.append("⚠ Key does not work — server may not support this key type")
                     self._output.append("→ Retrying with RSA-4096...")
                     self._push_rsa_fallback(user, host, key, password)
-                elif "denied" in stderr_lower or "authentication" in stderr_lower:
+            else:
+                stderr_lower = result.stderr.lower() if result.stderr else ""
+                if "denied" in stderr_lower or "authentication" in stderr_lower:
                     self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                     self._output.append("→ Wrong password or user rejected pubkey auth")
                 elif "connection" in stderr_lower or "connect" in stderr_lower:
@@ -289,6 +291,26 @@ class KeygenDialog(QDialog):
                     self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
         except Exception as e:
             self._output.append(f"Error: {e}")
+
+    def _verify_key_auth(self, user, host, key, password):
+        if not key:
+            return True
+        priv_key = key.replace(".pub", "") if key.endswith(".pub") else key
+        if not os.path.exists(priv_key):
+            return True
+        cmd = [
+            "ssh", "-i", priv_key,
+            "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "PreferredAuthentications=publickey",
+            f"{user}@{host}", "echo", "OK",
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            return result.returncode == 0 and "OK" in result.stdout
+        except Exception:
+            return True
 
     def _push_rsa_fallback(self, user, host, orig_key, password):
         import shutil
