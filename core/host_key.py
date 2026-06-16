@@ -1,4 +1,5 @@
 import subprocess
+import hashlib
 from pathlib import Path
 from utils.config import KNOWN_HOSTS
 from utils.logger import log
@@ -10,7 +11,13 @@ class HostKeyFetcher:
 
     def fetch(self, host: str, port: int = 22, legacy_mode: bool = False) -> dict | None:
         try:
-            cmd = ["ssh-keyscan", "-p", str(port), host]
+            cmd = ["ssh-keyscan", "-p", str(port)]
+            if legacy_mode:
+                cmd += [
+                    "-o", "KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group14-sha1",
+                    "-o", "HostKeyAlgorithms=+ssh-rsa,ssh-dss",
+                ]
+            cmd.append(host)
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=10,
             )
@@ -25,10 +32,12 @@ class HostKeyFetcher:
                     continue
                 parts = line.split(" ", 2)
                 if len(parts) >= 3:
+                    fingerprint = self._get_fingerprint(parts[1], parts[2])
                     keys.append({
                         "type": parts[1],
                         "key": parts[2],
                         "line": line,
+                        "fingerprint": fingerprint,
                     })
 
             if not keys:
@@ -38,6 +47,16 @@ class HostKeyFetcher:
         except Exception as e:
             log.error(f"HostKeyFetcher failed for {host}: {e}")
             return None
+
+    def _get_fingerprint(self, key_type: str, key_data: str) -> str:
+        try:
+            import base64
+            key_bytes = base64.b64decode(key_data)
+            fp = hashlib.sha256(key_bytes).digest()
+            b64 = base64.b64encode(fp).rstrip(b"=").decode()
+            return f"SHA256:{b64}"
+        except Exception:
+            return "(unable to compute fingerprint)"
 
     def is_known(self, host: str, port: int = 22) -> bool:
         try:

@@ -102,6 +102,10 @@ class SSHTab(QWidget):
                 dlg.show()
                 return
             else:
+                if self.session.legacy_mode:
+                    log.info(f"ssh-keyscan failed for legacy host {self.session.host}, connecting anyway")
+                    self._do_connect()
+                    return
                 self._show_overlay(f"Host unreachable: {self.session.host}")
                 return
         self._do_connect()

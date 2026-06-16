@@ -32,7 +32,7 @@ class HostKeyDialog(QWidget):
 
         info = QLabel(
             f"The authenticity of host '{self.host}:{self.port}' can't be established.\n"
-            f"Key fingerprint will be shown below."
+            f"Please verify the fingerprint below before accepting."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -41,7 +41,8 @@ class HostKeyDialog(QWidget):
         if keys:
             keys_text = ""
             for k in keys:
-                keys_text += f"  {k['type']}: {k['key'][:50]}...\n"
+                fp = k.get("fingerprint", "")
+                keys_text += f"  {k['type']} {fp}\n"
         elif self.host_info.get("legacy"):
             keys_text = (
                 "Host is reachable but ssh-keyscan could not retrieve the key.\n"
@@ -55,6 +56,7 @@ class HostKeyDialog(QWidget):
         self._keys_display.setPlainText(keys_text)
         self._keys_display.setReadOnly(True)
         self._keys_display.setMaximumHeight(100)
+        self._keys_display.setStyleSheet("font-family: monospace; font-size: 12px;")
         layout.addWidget(self._keys_display)
 
         btn_layout = QHBoxLayout()
