@@ -10,6 +10,7 @@ class SessionType(Enum):
     SERIAL = "serial"
     SHELL = "shell"
     VPN = "vpn"
+    VNC = "vnc"
 
 
 class AuthType(Enum):
@@ -43,6 +44,7 @@ class Session:
     vpn_realm: str = ""
     vpn_trusted_cert: str = ""
     vpn_ignore_cert: bool = False
+    vnc_port: int = 5901
 
     def to_dict(self) -> dict:
         return {
@@ -68,6 +70,7 @@ class Session:
             "vpn_realm": self.vpn_realm,
             "vpn_trusted_cert": self.vpn_trusted_cert,
             "vpn_ignore_cert": self.vpn_ignore_cert,
+            "vnc_port": self.vnc_port,
         }
 
     @classmethod
@@ -96,4 +99,5 @@ class Session:
             vpn_realm=d.get("vpn_realm", ""),
             vpn_trusted_cert=d.get("vpn_trusted_cert", ""),
             vpn_ignore_cert=d.get("vpn_ignore_cert", False),
+            vnc_port=d.get("vnc_port", 5900),
         )

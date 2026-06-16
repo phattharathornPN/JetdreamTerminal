@@ -33,10 +33,11 @@ class SessionDialog(QDialog):
         form.addRow(self._name_label, self._name)
 
         self._type = QComboBox()
-        self._type.addItems(["SSH", "Telnet", "RDP", "SFTP", "Serial", "VPN"])
+        self._type.addItems(["SSH", "Telnet", "RDP", "SFTP", "Serial", "VPN", "VNC"])
         type_map = {
             SessionType.SSH: 0, SessionType.TELNET: 1, SessionType.RDP: 2,
             SessionType.SFTP: 3, SessionType.SERIAL: 4, SessionType.VPN: 5,
+            SessionType.VNC: 6,
         }
         self._type.setCurrentIndex(type_map.get(self.session.session_type, 0))
         self._type.currentIndexChanged.connect(self._on_type_changed)
@@ -100,6 +101,10 @@ class SessionDialog(QDialog):
         self._vpn_cert.setPlaceholderText("sha256 hash from error message")
         self._vpn_cert_label = QLabel("Trusted Cert:")
         form.addRow(self._vpn_cert_label, self._vpn_cert)
+
+        self._vnc_port = QLineEdit(str(self.session.vnc_port or 5900))
+        self._vnc_port_label = QLabel("VNC Port:")
+        form.addRow(self._vnc_port_label, self._vnc_port)
 
         self._serial_port_layout = QHBoxLayout()
         self._serial_port = QComboBox()
@@ -187,23 +192,23 @@ class SessionDialog(QDialog):
         idx = self._type.currentIndex()
         is_rdp = idx == 2
         is_serial = idx == 4
-        is_shell = idx == 5
         is_ssh = idx == 0
         is_telnet = idx == 1
         is_sftp = idx == 3
         is_vpn = idx == 5
-        is_network = is_ssh or is_telnet or is_sftp or is_rdp or is_serial or is_vpn
+        is_vnc = idx == 6
+        is_network = is_ssh or is_telnet or is_sftp or is_rdp or is_serial or is_vpn or is_vnc
 
         self._host.setVisible(is_network)
         self._host_label.setVisible(is_network)
         self._port.setVisible(is_network)
         self._port_label.setVisible(is_network)
-        self._username.setVisible(is_network and not is_serial and not is_vpn)
-        self._username_label.setVisible(is_network and not is_serial and not is_vpn)
-        self._auth.setVisible(is_network and not is_serial and not is_rdp and not is_vpn)
-        self._auth_label.setVisible(is_network and not is_serial and not is_rdp and not is_vpn)
-        self._password.setVisible(is_network and not is_serial and not is_vpn)
-        self._password_label.setVisible(is_network and not is_serial and not is_vpn)
+        self._username.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
+        self._username_label.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
+        self._auth.setVisible(is_network and not is_serial and not is_rdp and not is_vpn and not is_vnc)
+        self._auth_label.setVisible(is_network and not is_serial and not is_rdp and not is_vpn and not is_vnc)
+        self._password.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
+        self._password_label.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
         self._serial_port_widget.setVisible(is_serial)
         self._serial_port_label.setVisible(is_serial)
         self._baudrate.setVisible(is_serial)
@@ -216,13 +221,16 @@ class SessionDialog(QDialog):
         self._vpn_cert.setVisible(is_vpn)
         self._vpn_cert_label.setVisible(is_vpn)
 
+        self._vnc_port.setVisible(is_vnc)
+        self._vnc_port_label.setVisible(is_vnc)
+
         self._host.setEnabled(True)
         self._port.setEnabled(True)
         self._username.setEnabled(True)
         self._auth.setEnabled(not is_rdp)
         self._key_widget.setEnabled(not is_rdp)
 
-        default_ports = {0: "22", 1: "23", 2: "3389", 3: "22", 4: "0", 5: "443"}
+        default_ports = {0: "22", 1: "23", 2: "3389", 3: "22", 4: "0", 5: "443", 6: "5901"}
         self._port.setText(default_ports.get(idx, "22"))
 
         for w in (self._name, self._host, self._port, self._username, self._password):
@@ -304,7 +312,8 @@ class SessionDialog(QDialog):
     def _on_save(self):
         self.session.name = self._name.text().strip()
         type_vals = [SessionType.SSH, SessionType.TELNET, SessionType.RDP,
-                     SessionType.SFTP, SessionType.SERIAL, SessionType.VPN]
+                     SessionType.SFTP, SessionType.SERIAL, SessionType.VPN,
+                     SessionType.VNC]
         self.session.session_type = type_vals[self._type.currentIndex()]
         self.session.host = self._host.text().strip()
         try:
@@ -331,6 +340,10 @@ class SessionDialog(QDialog):
         self.session.auto_save = self._auto_save.isChecked()
         self.session.vpn_realm = self._vpn_realm.text().strip()
         self.session.vpn_trusted_cert = self._vpn_cert.text().strip()
+        try:
+            self.session.vnc_port = int(self._vnc_port.text())
+        except ValueError:
+            self.session.vnc_port = 5900
 
         pw = self._password.text()
         if pw:

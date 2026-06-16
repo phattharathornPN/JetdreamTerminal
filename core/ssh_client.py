@@ -1,6 +1,20 @@
 from models.session import Session, SessionType, AuthType
 
 
+WINDOWS_HOST_PREFIXES = (
+    "win-", "win_", "desktop-", "desktop_",
+    "server-", "srv-", "dc-", "ad-", "ws-",
+)
+
+
+def _is_windows_host(host: str) -> bool:
+    parts = host.split(".")
+    if len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+        return False
+    h = host.lower()
+    return any(h.startswith(p) for p in WINDOWS_HOST_PREFIXES)
+
+
 def build_ssh_command(session: Session, password: str = "") -> tuple[list[str], dict]:
     cmd = ["ssh"]
     env = {}
@@ -13,6 +27,10 @@ def build_ssh_command(session: Session, password: str = "") -> tuple[list[str], 
             "-o", "MACs=+hmac-md5,hmac-sha1",
             "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
         ]
+
+    if _is_windows_host(session.host):
+        cmd += ["-o", "RequestTTY=yes", "-o", "SendEnv=TERM LANG"]
+        env["TERM"] = "xterm-256color"
 
     cmd += ["-o", "StrictHostKeyChecking=accept-new"]
     cmd += ["-p", str(session.port)]

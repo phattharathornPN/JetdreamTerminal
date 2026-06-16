@@ -155,16 +155,17 @@ class MainWindow(QMainWindow):
         has_favs = False
 
         groups: dict[str, QStandardItem] = {}
+        icon_map = {
+            SessionType.SSH: "🔐",
+            SessionType.TELNET: "📡",
+            SessionType.RDP: "🖥️",
+            SessionType.SFTP: "📁",
+            SessionType.SERIAL: "🔌",
+            SessionType.SHELL: "⬛",
+            SessionType.VPN: "🔒",
+            SessionType.VNC: "🖥️",
+        }
         for s in self.sessions:
-            icon_map = {
-                SessionType.SSH: "🔐",
-                SessionType.TELNET: "📡",
-                SessionType.RDP: "🖥️",
-                SessionType.SFTP: "📁",
-                SessionType.SERIAL: "🔌",
-                SessionType.SHELL: "⬛",
-                SessionType.VPN: "🔒",
-            }
             icon = icon_map.get(s.session_type, "📄")
             item = QStandardItem(f"{icon} {s.name}")
             item.setEditable(False)
@@ -244,6 +245,9 @@ class MainWindow(QMainWindow):
         if session.session_type == SessionType.VPN:
             from ui.vpn_tab import VpnTab
             tab = VpnTab(session, self)
+        elif session.session_type == SessionType.VNC:
+            from ui.vnc_tab import VncTab
+            tab = VncTab(session, self)
         else:
             tab = tab_cls(session, self)
         icon_map = {

@@ -170,13 +170,17 @@ class SftpPanel(QWidget):
             if name == "..":
                 self._go_up()
             else:
-                new_path = f"{self._current_path}/{name}".replace("//", "/")
+                base = self._current_path.replace("\\", "/").rstrip("/")
+                new_path = f"{base}/{name}"
                 self._path_edit.setText(new_path)
                 self._navigate()
 
     def _go_up(self):
-        parts = self._current_path.rsplit("/", 1)
-        parent = parts[0] if len(parts) > 1 else "/"
+        parts = self._current_path.replace("\\", "/").rsplit("/", 1)
+        if len(parts) > 1:
+            parent = parts[0] or "/"
+        else:
+            parent = "/"
         self._path_edit.setText(parent)
         self._navigate()
 
@@ -186,7 +190,8 @@ class SftpPanel(QWidget):
             return
         import os
         filename = os.path.basename(local_path)
-        remote_path = f"{self._current_path}/{filename}".replace("//", "/")
+        base = self._current_path.replace("\\", "/").rstrip("/")
+        remote_path = f"{base}/{filename}"
         self._status.setText(f"Uploading {filename}...")
         self._worker = SftpTransfer(self._browser, "upload", local_path, remote_path)
         self._worker.finished.connect(self._on_transfer_done)
@@ -202,7 +207,8 @@ class SftpPanel(QWidget):
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if not data or data.get("is_dir"):
                 continue
-            remote_path = f"{self._current_path}/{data['name']}".replace("//", "/")
+            base = self._current_path.replace("\\", "/").rstrip("/")
+            remote_path = f"{base}/{data['name']}"
             local_path, _ = QFileDialog.getSaveFileName(
                 self, f"Save {data['name']}", data['name']
             )

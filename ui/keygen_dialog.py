@@ -163,6 +163,9 @@ class KeygenDialog(QDialog):
             QMessageBox.warning(self, "Error", "Username and host are required")
             return
 
+        self._output.clear()
+        self._output.append(f"Pushing key to {user}@{host}...\n")
+
         cmd = ["ssh-copy-id"]
         if key:
             cmd += ["-i", key]
@@ -179,13 +182,23 @@ class KeygenDialog(QDialog):
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=60,
             )
-            self._output.append(result.stdout)
+            if result.stdout:
+                self._output.append(result.stdout)
             if result.stderr:
                 self._output.append(result.stderr)
             if result.returncode == 0:
                 self._output.append(f"\n✅ Key pushed to {user}@{host}")
             else:
-                self._output.append(f"\n❌ Failed (exit code {result.returncode})")
+                self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
+                stderr_lower = result.stderr.lower() if result.stderr else ""
+                if "denied" in stderr_lower or "authentication" in stderr_lower:
+                    self._output.append("→ Wrong password or user rejected pubkey auth")
+                elif "connection" in stderr_lower or "connect" in stderr_lower:
+                    self._output.append("→ Cannot reach host — check IP/hostname and port 22")
+                elif "no such file" in stderr_lower or "id file" in stderr_lower:
+                    self._output.append("→ Key file not found — generate a key first")
+                elif "already" in stderr_lower:
+                    self._output.append("→ Key may already be installed")
         except FileNotFoundError:
             self._output.append("❌ sshpass not found. Install: sudo apt install sshpass")
         except Exception as e:

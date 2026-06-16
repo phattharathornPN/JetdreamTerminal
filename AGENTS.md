@@ -23,15 +23,16 @@ Or use `./launch.sh` (activates venv automatically).
 ## Architecture
 
 - **Entry point**: `main.py` → `MainWindow`
-- **Connection types**: Each has a `*_tab.py` in `ui/` and a `*_client.py` in `core/`
-  - `ssh_tab.py` ↔ `ssh_client.py` (SSH command builder, legacy mode flags)
-  - `telnet_tab.py` ↔ `telnet_client.py` (subprocess telnet)
-  - `serial_tab.py` ↔ `serial_client.py` (pyserial + QTimer polling)
-  - `rdp_tab.py` ↔ `rdp_client.py` (xfreerdp subprocess)
-  - `sftp_tab.py` ↔ `sftp_browser.py` (paramiko Transport — **not** SSHClient)
-  - `vpn_tab.py` ↔ subprocess (OpenConnect/CLI VPN wrapper — no separate `vpn_client.py`)
-- **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback.
-- **PTY management**: `pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
+- **Connection types**: Each has a `*_tab.py` in `ui/` — some have companion modules in `core/`
+  - `ssh_tab.py` ↔ `core/ssh_client.py` (SSH command builder, legacy mode flags)
+  - `telnet_tab.py` — no separate client; uses `build_telnet_command()` from `ssh_client.py`, launches via `PtyManager`
+  - `serial_tab.py` ↔ `core/serial_client.py` (pyserial + QTimer polling)
+  - `rdp_tab.py` ↔ `core/rdp_client.py` (xfreerdp subprocess)
+  - `sftp_tab.py` ↔ `core/sftp_browser.py` (paramiko Transport — **not** SSHClient)
+  - `vpn_tab.py` — no separate client; runs `sudo openfortivpn` via `PtyManager`
+  - `shell_tab.py` — no client; launches `$SHELL` via `PtyManager`
+- **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback. `ui/highlight.py` provides regex-based syntax highlighting (IPs, paths, errors, keywords).
+- **PTY management**: `core/pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
 - **Data persistence**: SQLite via `utils/db.py`. Schema auto-migrates (adds columns if missing). DB lives at `~/.local/share/jetdreamterminal/sessions.db`.
 - **Credentials**: Fernet encryption via `core/crypto.py`. Key at `~/.config/jetdreamterminal/key.bin`.
 
@@ -49,6 +50,11 @@ Or use `./launch.sh` (activates venv automatically).
 - **ssh-copy-id flags**: Must pass `-o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no` for legacy devices that reject pubkey auth on first connect.
 - **Desktop shortcut**: Ubuntu/GNOME requires `gio set metadata::trusted true` on `.desktop` files — `install.sh` handles this.
 - **Symlink resolution**: `launch.sh` uses `readlink -f` to resolve symlinks. Without it, `cd $(dirname "$0")` lands in `/usr/local/bin/` instead of the app dir.
+- **VPN uses openfortivpn**, not OpenConnect. Requires `sudo` — the app runs `sudo -S openfortivpn` via the PTY.
+- **Auto-reconnect**: SSH and Telnet tabs auto-reconnect up to 3 times on non-zero exit with increasing delay (1s, 2s, 3s). Don't change this without testing.
+- **Auto-save**: Sessions with `auto_save=True` save terminal output to `~/JetdreamTerminal-logs/` on close.
+- **Windows SSH support**: SSH to Windows hosts (OpenSSH on Windows Server / Windows 10+). `_is_windows_host()` heuristic detects non-IP hostnames. Adds `RequestTTY=yes` and `TERM=xterm-256color`.
+- **Windows SFTP**: `_resolve_path()` tries `%USERPROFILE%` → `$env:USERPROFILE` → `$HOME` with `sftp.stat()` validation. Falls back to `.` if all fail. Path separators normalized to `/`.
 
 ## No lint/test/format
 

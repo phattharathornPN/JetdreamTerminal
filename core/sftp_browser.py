@@ -3,6 +3,7 @@ import os
 import socket
 from models.session import Session
 from core.crypto import decrypt
+from core.ssh_client import _is_windows_host
 from utils.logger import log
 
 
@@ -65,17 +66,44 @@ class SftpBrowser:
 
     def _resolve_path(self, path: str) -> str:
         if path == "~" or path.startswith("~/"):
-            try:
-                channel = self._transport.open_session()
-                channel.exec_command("echo $HOME")
-                home = channel.recv(1024).decode().strip()
-                channel.close()
+            home = self._get_home()
+            if home:
                 if path == "~":
                     return home
-                return home + path[1:]
+                rest = path[2:].lstrip("/")
+                return home + "/" + rest
+            return "."
+        return path.replace("\\", "/")
+
+    def _get_home(self) -> str:
+        is_win = _is_windows_host(self.session.host)
+        if is_win:
+            cmds = [
+                "echo %USERPROFILE%",
+                "echo $env:USERPROFILE",
+                "echo $HOME",
+            ]
+        else:
+            cmds = ["echo $HOME"]
+        for cmd in cmds:
+            try:
+                channel = self._transport.open_session()
+                channel.exec_command(cmd)
+                home = channel.recv(1024).decode().strip()
+                channel.close()
+                if home and not home.startswith("$") and not home.startswith("%"):
+                    try:
+                        self._sftp.stat(home)
+                        return home
+                    except Exception:
+                        pass
             except Exception:
-                return path
-        return path
+                pass
+        try:
+            self._sftp.stat(".")
+            return "."
+        except Exception:
+            return ""
 
     def list_dir(self, path: str = ".") -> list[dict]:
         if not self._sftp:

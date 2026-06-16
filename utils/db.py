@@ -49,6 +49,8 @@ def init_db():
         conn.execute("ALTER TABLE sessions ADD COLUMN vpn_trusted_cert TEXT DEFAULT ''")
     if "vpn_ignore_cert" not in columns:
         conn.execute("ALTER TABLE sessions ADD COLUMN vpn_ignore_cert INTEGER DEFAULT 0")
+    if "vnc_port" not in columns:
+        conn.execute("ALTER TABLE sessions ADD COLUMN vnc_port INTEGER DEFAULT 5901")
     conn.execute("UPDATE sessions SET session_type='serial' WHERE session_type='console'")
     conn.commit()
     conn.close()

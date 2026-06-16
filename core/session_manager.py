@@ -13,7 +13,7 @@ def save(session: Session) -> int:
                 auth_type=?, password_encrypted=?, key_path=?, grp=?,
                 last_used=?, legacy_mode=?,
                 rdp_width=?, rdp_height=?, serial_port=?, baudrate=?,
-                favorite=?, auto_save=?, vpn_realm=?, vpn_trusted_cert=?, vpn_ignore_cert=?
+                favorite=?, auto_save=?,                 vpn_realm=?, vpn_trusted_cert=?, vpn_ignore_cert=?, vnc_port=?
             WHERE id=?
         """, (
             session.name, session.session_type.value, session.host,
@@ -23,7 +23,8 @@ def save(session: Session) -> int:
             session.rdp_width, session.rdp_height,
             session.serial_port, session.baudrate,
             session.favorite, session.auto_save,
-            session.vpn_realm, session.vpn_trusted_cert, session.vpn_ignore_cert, session.id,
+            session.vpn_realm, session.vpn_trusted_cert, session.vpn_ignore_cert,
+            session.vnc_port, session.id,
         ))
         conn.commit()
         conn.close()
@@ -35,8 +36,8 @@ def save(session: Session) -> int:
                  password_encrypted, key_path, grp, created_at,
                  legacy_mode, rdp_width, rdp_height,
                  serial_port, baudrate, favorite, auto_save,
-                 vpn_realm, vpn_trusted_cert, vpn_ignore_cert)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 vpn_realm, vpn_trusted_cert, vpn_ignore_cert, vnc_port)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             session.name, session.session_type.value, session.host,
             session.port, session.username, session.auth_type.value,
@@ -46,6 +47,7 @@ def save(session: Session) -> int:
             session.serial_port, session.baudrate,
             session.favorite, session.auto_save,
             session.vpn_realm, session.vpn_trusted_cert, session.vpn_ignore_cert,
+            session.vnc_port,
         ))
         conn.commit()
         row_id = cur.lastrowid
@@ -82,6 +84,7 @@ def load_all() -> list[Session]:
             vpn_realm=r["vpn_realm"] if "vpn_realm" in r.keys() else "",
             vpn_trusted_cert=r["vpn_trusted_cert"] if "vpn_trusted_cert" in r.keys() else "",
             vpn_ignore_cert=bool(r["vpn_ignore_cert"]) if "vpn_ignore_cert" in r.keys() else False,
+            vnc_port=r["vnc_port"] if "vnc_port" in r.keys() else 5900,
         )
         sessions.append(s)
     return sessions
@@ -124,6 +127,7 @@ def get_by_id(session_id: int) -> Session | None:
         vpn_realm=r["vpn_realm"] if "vpn_realm" in r.keys() else "",
         vpn_trusted_cert=r["vpn_trusted_cert"] if "vpn_trusted_cert" in r.keys() else "",
         vpn_ignore_cert=bool(r["vpn_ignore_cert"]) if "vpn_ignore_cert" in r.keys() else False,
+        vnc_port=r["vnc_port"] if "vnc_port" in r.keys() else 5900,
     )
 
 

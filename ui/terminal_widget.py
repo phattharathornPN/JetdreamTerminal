@@ -420,7 +420,7 @@ class TerminalWidget(QWidget):
         bar_y = int(((top - self._scroll_off) / total) * self.height())
         bar_y = max(0, min(bar_y, self.height() - bar_h))
         from PyQt6.QtCore import QRect
-        return QRect(self.width() - 8, bar_y, 7, bar_h)
+        return QRect(self.width() - 12, bar_y, 10, bar_h)
 
     def _draw_scrollbar(self, painter: QPainter):
         rect = self._scrollbar_rect()
@@ -506,7 +506,12 @@ class TerminalWidget(QWidget):
             self._scroll_down(self._vis_rows)
             return
 
-        if self._scroll_off > 0:
+        if self._scroll_off > 0 and key not in (
+            Qt.Key.Key_Up, Qt.Key.Key_Down,
+            Qt.Key.Key_Left, Qt.Key.Key_Right,
+            Qt.Key.Key_PageUp, Qt.Key.Key_PageDown,
+            Qt.Key.Key_Home, Qt.Key.Key_End,
+        ):
             self._scroll_off = 0
             self.update()
 
