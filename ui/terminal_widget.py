@@ -73,6 +73,10 @@ class TerminalWidget(QWidget):
         self._serial = None
         self._scroll_off = 0
 
+        self._sb_dragging = False
+        self._sb_drag_start_y = 0
+        self._sb_drag_start_off = 0
+
         self._sel_start: QPoint | None = None
         self._sel_end: QPoint | None = None
         self._selecting = False
@@ -129,8 +133,6 @@ class TerminalWidget(QWidget):
             self._stream.feed(text)
         except Exception as e:
             log.error(f"pyte feed error: {e}")
-        if self._scroll_off > 0:
-            self._scroll_off = 0
         self.update()
 
     def _get_top_row(self) -> int:
@@ -397,15 +399,22 @@ class TerminalWidget(QWidget):
         self._draw_scroll_indicator(painter)
         painter.end()
 
-    def _draw_scrollbar(self, painter: QPainter):
+    def _scrollbar_rect(self):
         top = self._get_top_row()
         if top <= 0:
-            return
+            return None
         total = top + self._vis_rows
         bar_h = max(20, int(self.height() * self._vis_rows / total))
         bar_y = int(((top - self._scroll_off) / total) * self.height())
         bar_y = max(0, min(bar_y, self.height() - bar_h))
-        painter.fillRect(self.width() - 6, bar_y, 5, bar_h, QColor("#4c566a"))
+        from PyQt6.QtCore import QRect
+        return QRect(self.width() - 8, bar_y, 7, bar_h)
+
+    def _draw_scrollbar(self, painter: QPainter):
+        rect = self._scrollbar_rect()
+        if rect:
+            color = QColor("#88c0d0") if self._sb_dragging else QColor("#4c566a")
+            painter.fillRect(rect, color)
 
     def _draw_scroll_indicator(self, painter: QPainter):
         if self._scroll_off == 0:
@@ -566,6 +575,12 @@ class TerminalWidget(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
+            sb = self._scrollbar_rect()
+            if sb and sb.contains(event.pos()):
+                self._sb_dragging = True
+                self._sb_drag_start_y = event.pos().y()
+                self._sb_drag_start_off = self._scroll_off
+                return
             self.setFocus()
             cell = self._cell_from_pos(event.pos())
             self._sel_start = QPoint(cell.x(), cell.y())
@@ -574,6 +589,23 @@ class TerminalWidget(QWidget):
             self.update()
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        if self._sb_dragging:
+            dy = self._sb_drag_start_y - event.pos().y()
+            top = self._get_top_row()
+            total = top + self._vis_rows
+            if total > self._vis_rows:
+                max_off = top
+                scroll_range = max(1, self.height() - max(20, int(self.height() * self._vis_rows / total)))
+                line_per_px = max_off / scroll_range
+                new_off = self._sb_drag_start_off + int(dy * line_per_px)
+                self._scroll_off = max(0, min(new_off, max_off))
+                self.update()
+            return
+        sb = self._scrollbar_rect()
+        if sb and sb.contains(event.pos()):
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setCursor(Qt.CursorShape.IBeamCursor)
         if self._selecting:
             cell = self._cell_from_pos(event.pos())
             new_end = QPoint(cell.x(), cell.y())
@@ -608,6 +640,9 @@ class TerminalWidget(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
+            if self._sb_dragging:
+                self._sb_dragging = False
+                return
             self._selecting = False
             self._auto_scroll_timer.stop()
             self._auto_scroll_dir = 0
