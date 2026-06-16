@@ -29,7 +29,7 @@ Or use `./launch.sh` (activates venv automatically).
   - `serial_tab.py` ↔ `serial_client.py` (pyserial + QTimer polling)
   - `rdp_tab.py` ↔ `rdp_client.py` (xfreerdp subprocess)
   - `sftp_tab.py` ↔ `sftp_browser.py` (paramiko Transport — **not** SSHClient)
-  - `vpn_tab.py` ↔ subprocess (OpenConnect/CLI VPN wrapper)
+  - `vpn_tab.py` ↔ subprocess (OpenConnect/CLI VPN wrapper — no separate `vpn_client.py`)
 - **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback.
 - **PTY management**: `pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
 - **Data persistence**: SQLite via `utils/db.py`. Schema auto-migrates (adds columns if missing). DB lives at `~/.local/share/jetdreamterminal/sessions.db`.
@@ -38,8 +38,8 @@ Or use `./launch.sh` (activates venv automatically).
 ## Gotchas
 
 - **paramiko SFTP**: Uses `paramiko.Transport` directly, not `SSHClient`. paramiko 5.0.0 has a "No existing session" bug with SSHClient. Don't refactor to SSHClient without testing.
-- **Legacy SSH mode**: Extra `-o` flags for Cisco/Aruba older devices. This is critical for the user's network work — don't simplify these flags.
-- **DB migration**: `init_db()` runs ALTER TABLE for new columns. Don't add columns without adding migration logic in `utils/db.py:init_db()`.
+- **Legacy SSH mode**: Extra `-o` flags for Cisco/Aruba older devices (including `PubkeyAcceptedAlgorithms=+ssh-rsa`). This is critical for the user's network work — don't simplify these flags.
+- **DB migration**: `init_db()` runs ALTER TABLE for new columns (currently: `serial_port`, `baudrate`, `favorite`, `auto_save`, `vpn_realm`, `vpn_trusted_cert`, `vpn_ignore_cert`). Don't add columns without adding migration logic in `utils/db.py:init_db()`.
 - **Session type rename**: Old type "console" is migrated to "serial" on startup. Don't reintroduce "console" as a session type.
 - **Thai text**: `ThaiScreen.draw()` merges combining marks (Unicode category "M") into the previous cell. If you touch terminal rendering, preserve this logic.
 - **Cursor rendering**: Cursor position must use screen-relative coordinates (`cursor.y - top`), not raw `cursor.y` (buffer row). Buffer row grows with output → cursor drawn off-screen. See `terminal_widget.py` paintEvent cursor block.
