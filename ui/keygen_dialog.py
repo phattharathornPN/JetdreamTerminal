@@ -150,10 +150,13 @@ class KeygenDialog(QDialog):
                 if os.path.exists(pub_file):
                     with open(pub_file) as f:
                         self._output.append(f"\nPublic key:\n{f.read()}")
+                    self._push_key.setText(pub_file)
         except Exception as e:
             self._output.append(f"Error: {e}")
 
     def _push_key_to_server(self):
+        import shutil
+
         user = self._push_user.text().strip()
         host = self._push_host.text().strip()
         key = self._push_key.text().strip()
@@ -163,24 +166,40 @@ class KeygenDialog(QDialog):
             QMessageBox.warning(self, "Error", "Username and host are required")
             return
 
+        if not shutil.which("ssh-copy-id"):
+            self._output.append("❌ ssh-copy-id not found. Install openssh-client: sudo apt install openssh-client")
+            return
+
+        if not shutil.which("sshpass"):
+            self._output.append("❌ sshpass not found. Install: sudo apt install sshpass")
+            return
+
         self._output.clear()
         self._output.append(f"Pushing key to {user}@{host}...\n")
 
         cmd = ["ssh-copy-id"]
         if key:
+            if not os.path.exists(key):
+                self._output.append(f"❌ Public key file not found: {key}")
+                self._output.append("→ Generate a key first, or browse to select the .pub file")
+                return
             cmd += ["-i", key]
         cmd += [
             "-o", "PreferredAuthentications=password,keyboard-interactive",
             "-o", "PubkeyAuthentication=no",
+            "-o", "StrictHostKeyChecking=accept-new",
             f"{user}@{host}",
         ]
 
+        env = os.environ.copy()
         if password:
-            cmd = ["sshpass", "-p", password] + cmd
+            cmd = ["sshpass", "-e"] + cmd
+            env["SSHPASS"] = password
 
         try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=60,
+                env=env,
             )
             if result.stdout:
                 self._output.append(result.stdout)
@@ -199,8 +218,6 @@ class KeygenDialog(QDialog):
                     self._output.append("→ Key file not found — generate a key first")
                 elif "already" in stderr_lower:
                     self._output.append("→ Key may already be installed")
-        except FileNotFoundError:
-            self._output.append("❌ sshpass not found. Install: sudo apt install sshpass")
         except Exception as e:
             self._output.append(f"Error: {e}")
 
