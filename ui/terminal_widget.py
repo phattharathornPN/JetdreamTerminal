@@ -34,7 +34,46 @@ class CopyToast(QLabel):
         QTimer.singleShot(1500, self.hide)
 
 
+_ALT_SCREEN_MODE = 1049 << 5
+
+
 class ThaiScreen(pyte.Screen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_alt_buffer = None
+        self._saved_alt_cursor = None
+
+    def set_mode(self, *modes, **kwargs):
+        mode_list = list(modes)
+        if kwargs.get("private"):
+            mode_list = [m << 5 for m in modes]
+        if _ALT_SCREEN_MODE in mode_list:
+            self._saved_alt_buffer = {}
+            for row_y, row in self.buffer.items():
+                self._saved_alt_buffer[row_y] = dict(row)
+            self._saved_alt_cursor = (self.cursor.x, self.cursor.y, self.cursor.hidden)
+            self.buffer.clear()
+            self.cursor_position()
+        super().set_mode(*modes, **kwargs)
+
+    def reset_mode(self, *modes, **kwargs):
+        mode_list = list(modes)
+        if kwargs.get("private"):
+            mode_list = [m << 5 for m in modes]
+        if _ALT_SCREEN_MODE in mode_list:
+            if self._saved_alt_buffer is not None:
+                self.buffer.clear()
+                for row_y, row in self._saved_alt_buffer.items():
+                    for x, cell in row.items():
+                        self.buffer[row_y][x] = cell
+                self._saved_alt_buffer = None
+            if self._saved_alt_cursor is not None:
+                self.cursor.x = self._saved_alt_cursor[0]
+                self.cursor.y = self._saved_alt_cursor[1]
+                self.cursor.hidden = self._saved_alt_cursor[2]
+                self._saved_alt_cursor = None
+        super().reset_mode(*modes, **kwargs)
+
     def draw(self, char: str):
         for ch in char:
             cat = unicodedata.category(ch)

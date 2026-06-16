@@ -32,7 +32,7 @@ Or use `./launch.sh` (activates venv automatically).
   - `vpn_tab.py` — no separate client; runs `sudo openfortivpn` via `PtyManager`
   - `vnc_tab.py` ↔ `core/vnc_client.py` (vncviewer/remmina subprocess)
   - `shell_tab.py` — no client; launches `$SHELL` via `PtyManager`
-- **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback. `ui/highlight.py` provides regex-based syntax highlighting (IPs, paths, errors, keywords).
+- **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback. `ui/highlight.py` provides regex-based syntax highlighting (IPs, paths, errors, keywords). Default terminal theme is Dracula; QSS stylesheet uses Nord palette.
 - **PTY management**: `core/pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
 - **Data persistence**: SQLite via `utils/db.py`. Schema auto-migrates (adds columns if missing). DB lives at `~/.local/share/jetdreamterminal/sessions.db`.
 - **Credentials**: Fernet encryption via `core/crypto.py`. Key at `~/.config/jetdreamterminal/key.bin`.
@@ -44,6 +44,7 @@ Or use `./launch.sh` (activates venv automatically).
 - **DB migration**: `init_db()` runs ALTER TABLE for new columns (currently: `serial_port`, `baudrate`, `favorite`, `auto_save`, `vpn_realm`, `vpn_trusted_cert`, `vpn_ignore_cert`, `vnc_port`). Don't add columns without adding migration logic in `utils/db.py:init_db()`.
 - **Session type rename**: Old type "console" is migrated to "serial" on startup. Don't reintroduce "console" as a session type.
 - **Thai text**: `ThaiScreen.draw()` merges combining marks (Unicode category "M") into the previous cell. If you touch terminal rendering, preserve this logic.
+- **Alternate screen buffer**: `ThaiScreen` overrides `set_mode`/`reset_mode` to implement DECSET/DECRST 1049 (alternate screen). pyte 0.8.2 doesn't handle this — without the override, programs like `htop` and `systemctl status` destroy the scrollback buffer when they exit. Don't remove the `_saved_alt_buffer`/`_saved_alt_cursor` logic.
 - **Cursor rendering**: Cursor position must use screen-relative coordinates (`cursor.y - top`), not raw `cursor.y` (buffer row). Buffer row grows with output → cursor drawn off-screen. See `terminal_widget.py` paintEvent cursor block.
 - **Key file optional**: SSH sessions can omit key_path — SSH uses default key after `ssh-copy-id`. Don't make key_path required.
 - **Host key verification**: `ssh-keyscan` must receive legacy flags (`KexAlgorithms`, `HostKeyAlgorithms`) for Cisco/Aruba devices. Dialog shows SHA256 fingerprints. Legacy devices that fail keyscan skip the dialog and connect directly.
