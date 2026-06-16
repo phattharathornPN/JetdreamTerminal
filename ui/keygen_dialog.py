@@ -154,6 +154,53 @@ class KeygenDialog(QDialog):
         except Exception as e:
             self._output.append(f"Error: {e}")
 
+    def _detect_authorized_keys_path(self, user, host, password):
+        cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
+        cmd += [f"{user}@{host}", "sshd -T 2>/dev/null | grep authorizedkeysfile"]
+        env = os.environ.copy()
+        if password:
+            cmd = ["sshpass", "-e"] + ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
+            cmd += [f"{user}@{host}", "sshd -T 2>/dev/null | grep authorizedkeysfile"]
+            env["SSHPASS"] = password
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+            for line in result.stdout.strip().splitlines():
+                if "authorizedkeysfile" in line.lower():
+                    path = line.split(None, 1)[-1].strip()
+                    path = path.replace("%u", user).replace("~", f"/home/{user}")
+                    return path
+        except Exception:
+            pass
+        return None
+
+    def _fix_authorized_keys_location(self, user, host, password, pub_key_path):
+        auth_keys_path = self._detect_authorized_keys_path(user, host, password)
+        if not auth_keys_path or auth_keys_path == f"/home/{user}/.ssh/authorized_keys":
+            return
+        self._output.append(f"\n🔧 Server uses AuthorizedKeysFile: {auth_keys_path}")
+        self._output.append("   Copying key to correct location...")
+        try:
+            with open(pub_key_path) as f:
+                pub_key = f.read().strip()
+            remote_cmd = (
+                f"mkdir -p $(dirname {auth_keys_path}) && "
+                f"grep -qxF '{pub_key}' {auth_keys_path} 2>/dev/null || "
+                f"echo '{pub_key}' >> {auth_keys_path} && "
+                f"chmod 600 {auth_keys_path} && echo OK"
+            )
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", f"{user}@{host}", remote_cmd]
+            env = os.environ.copy()
+            if password:
+                cmd = ["sshpass", "-e"] + ["ssh", "-o", "StrictHostKeyChecking=accept-new", f"{user}@{host}", remote_cmd]
+                env["SSHPASS"] = password
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+            if "OK" in result.stdout:
+                self._output.append("✅ Key copied to correct location")
+            else:
+                self._output.append(f"⚠ Could not copy key: {result.stderr.strip()}")
+        except Exception as e:
+            self._output.append(f"⚠ Could not fix key location: {e}")
+
     def _push_key_to_server(self):
         import shutil
 
@@ -188,6 +235,7 @@ class KeygenDialog(QDialog):
             "-o", "PreferredAuthentications=password,keyboard-interactive",
             "-o", "PubkeyAuthentication=no",
             "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "IdentitiesOnly=yes",
             f"{user}@{host}",
         ]
 
@@ -207,19 +255,71 @@ class KeygenDialog(QDialog):
                 self._output.append(result.stderr)
             if result.returncode == 0:
                 self._output.append(f"\n✅ Key pushed to {user}@{host}")
+                if key:
+                    self._fix_authorized_keys_location(user, host, password, key)
             else:
-                self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                 stderr_lower = result.stderr.lower() if result.stderr else ""
-                if "denied" in stderr_lower or "authentication" in stderr_lower:
+                if "not in PubkeyAcceptedKeyTypes" in result.stderr or "key type" in stderr_lower:
+                    self._output.append(f"\n❌ Server does not support this key type")
+                    self._output.append("→ Retrying with RSA-4096...")
+                    self._push_rsa_fallback(user, host, key, password)
+                elif "denied" in stderr_lower or "authentication" in stderr_lower:
+                    self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                     self._output.append("→ Wrong password or user rejected pubkey auth")
                 elif "connection" in stderr_lower or "connect" in stderr_lower:
+                    self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                     self._output.append("→ Cannot reach host — check IP/hostname and port 22")
                 elif "no such file" in stderr_lower or "id file" in stderr_lower:
+                    self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                     self._output.append("→ Key file not found — generate a key first")
                 elif "already" in stderr_lower:
+                    self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
                     self._output.append("→ Key may already be installed")
+                else:
+                    self._output.append(f"\n❌ ssh-copy-id failed (exit code {result.returncode})")
         except Exception as e:
             self._output.append(f"Error: {e}")
+
+    def _push_rsa_fallback(self, user, host, orig_key, password):
+        import shutil
+        rsa_key = os.path.expanduser("~/.ssh/id_rsa_fallback")
+        rsa_pub = rsa_key + ".pub"
+        try:
+            self._output.append("   Generating RSA-4096 key...")
+            result = subprocess.run(
+                ["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", rsa_key, "-N", "", "-C", "fallback"],
+                capture_output=True, text=True, timeout=30, input="y\n",
+            )
+            if result.returncode != 0:
+                self._output.append(f"❌ Failed to generate RSA key: {result.stderr}")
+                return
+            self._output.append(f"   Generated: {rsa_key}")
+
+            env = os.environ.copy()
+            cmd = [
+                "ssh-copy-id", "-i", rsa_pub,
+                "-o", "PreferredAuthentications=password,keyboard-interactive",
+                "-o", "PubkeyAuthentication=no",
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "IdentitiesOnly=yes",
+                f"{user}@{host}",
+            ]
+            if password:
+                cmd = ["sshpass", "-e"] + cmd
+                env["SSHPASS"] = password
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
+            if result.stdout:
+                self._output.append(result.stdout)
+            if result.stderr:
+                self._output.append(result.stderr)
+            if result.returncode == 0:
+                self._output.append(f"\n✅ RSA key pushed to {user}@{host}")
+                self._fix_authorized_keys_location(user, host, password, rsa_pub)
+                self._push_key.setText(rsa_pub)
+            else:
+                self._output.append(f"\n❌ RSA push also failed")
+        except Exception as e:
+            self._output.append(f"❌ Fallback failed: {e}")
 
     def _center_on_parent(self):
         parent = self.parent()
