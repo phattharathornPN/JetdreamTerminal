@@ -165,44 +165,53 @@ class KeygenDialog(QDialog):
             self._output.append(f"Error: {e}")
 
     def _detect_authorized_keys_path(self, user, host, password):
-        cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
-        cmd += [f"{user}@{host}", "sshd -T 2>/dev/null | grep authorizedkeysfile"]
         env = os.environ.copy()
         if password:
-            cmd = ["sshpass", "-e"] + ["ssh", "-o", "StrictHostKeyChecking=accept-new"]
-            cmd += [f"{user}@{host}", "sshd -T 2>/dev/null | grep authorizedkeysfile"]
             env["SSHPASS"] = password
         try:
+            auth_cmd = (
+                "sshd -T 2>/dev/null | grep -i authorizedkeysfile | awk '{print $2}'"
+            )
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
+                   "-o", "PreferredAuthentications=password,keyboard-interactive",
+                   f"{user}@{host}", auth_cmd]
+            if password:
+                cmd = ["sshpass", "-e"] + cmd
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
-            for line in result.stdout.strip().splitlines():
-                if "authorizedkeysfile" in line.lower():
-                    path = line.split(None, 1)[-1].strip()
-                    path = path.replace("%u", user).replace("~", f"/home/{user}")
-                    return path
+            path = result.stdout.strip()
+            if path:
+                path = path.replace("%u", user).replace("~", f"/home/{user}")
+                return path
         except Exception:
             pass
         return None
 
     def _fix_authorized_keys_location(self, user, host, password, pub_key_path):
         auth_keys_path = self._detect_authorized_keys_path(user, host, password)
-        if not auth_keys_path or auth_keys_path == f"/home/{user}/.ssh/authorized_keys":
+        if not auth_keys_path:
+            self._output.append("   ℹ Could not detect AuthorizedKeysFile — skipping location fix")
+            return
+        if auth_keys_path == f"/home/{user}/.ssh/authorized_keys":
             return
         self._output.append(f"\n🔧 Server uses AuthorizedKeysFile: {auth_keys_path}")
         self._output.append("   Copying key to correct location...")
         try:
             with open(pub_key_path) as f:
                 pub_key = f.read().strip()
+            env = os.environ.copy()
+            if password:
+                env["SSHPASS"] = password
             remote_cmd = (
                 f"mkdir -p $(dirname {auth_keys_path}) && "
                 f"grep -qxF '{pub_key}' {auth_keys_path} 2>/dev/null || "
                 f"echo '{pub_key}' >> {auth_keys_path} && "
                 f"chmod 600 {auth_keys_path} && echo OK"
             )
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new", f"{user}@{host}", remote_cmd]
-            env = os.environ.copy()
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
+                   "-o", "PreferredAuthentications=password,keyboard-interactive",
+                   f"{user}@{host}", remote_cmd]
             if password:
-                cmd = ["sshpass", "-e"] + ["ssh", "-o", "StrictHostKeyChecking=accept-new", f"{user}@{host}", remote_cmd]
-                env["SSHPASS"] = password
+                cmd = ["sshpass", "-e"] + cmd
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
             if "OK" in result.stdout:
                 self._output.append("✅ Key copied to correct location")
@@ -347,6 +356,10 @@ class KeygenDialog(QDialog):
             if result.returncode == 0:
                 self._output.append(f"\n✅ RSA key pushed to {user}@{host}")
                 self._fix_authorized_keys_location(user, host, password, rsa_pub)
+                if self._verify_key_auth(user, host, rsa_pub, password):
+                    self._output.append("✅ RSA key authentication verified!")
+                else:
+                    self._output.append("⚠ RSA key still not working — check server sshd_config")
                 self._push_key.setText(rsa_pub)
             else:
                 self._output.append(f"\n❌ RSA push also failed")
