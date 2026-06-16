@@ -2,7 +2,7 @@
 
 ## What this is
 
-PyQt6 terminal client for Linux (MobaXterm clone). Supports SSH, Telnet, RDP, Serial, SFTP, and local shell. Python 3.12, single-user desktop app. Not a library — no tests, no CI.
+PyQt6 terminal client for Linux (MobaXterm clone). Supports SSH, Telnet, RDP, Serial, SFTP, VPN, and local shell. Python 3.12, single-user desktop app. Not a library — no tests, no CI.
 
 ## Run
 
@@ -29,6 +29,7 @@ Or use `./launch.sh` (activates venv automatically).
   - `serial_tab.py` ↔ `serial_client.py` (pyserial + QTimer polling)
   - `rdp_tab.py` ↔ `rdp_client.py` (xfreerdp subprocess)
   - `sftp_tab.py` ↔ `sftp_browser.py` (paramiko Transport — **not** SSHClient)
+  - `vpn_tab.py` ↔ subprocess (OpenConnect/CLI VPN wrapper)
 - **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback.
 - **PTY management**: `pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
 - **Data persistence**: SQLite via `utils/db.py`. Schema auto-migrates (adds columns if missing). DB lives at `~/.local/share/jetdreamterminal/sessions.db`.

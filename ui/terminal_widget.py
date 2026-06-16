@@ -86,6 +86,11 @@ class TerminalWidget(QWidget):
 
         self._toast = CopyToast(self)
 
+        self._cursor_visible = True
+        self._cursor_blink_timer = QTimer(self)
+        self._cursor_blink_timer.timeout.connect(self._blink_cursor)
+        self._cursor_blink_timer.start(500)
+
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
@@ -116,6 +121,7 @@ class TerminalWidget(QWidget):
 
     def _on_data(self, data: bytes):
         self._byte_buffer += data
+        self._reset_cursor_blink()
         try:
             text = self._byte_buffer.decode('utf-8')
             self._byte_buffer = b""
@@ -383,7 +389,7 @@ class TerminalWidget(QWidget):
                         painter.drawLine(px, uy, px + self._cell_w - 1, uy)
                         break
 
-        if at_bottom:
+        if at_bottom and self._cursor_visible:
             cursor = self._screen.cursor
             if cursor and not self._selecting:
                 cur_in_sel = has_sel and sy <= cursor.y <= ey if has_sel else False
@@ -569,10 +575,19 @@ class TerminalWidget(QWidget):
             self._scroll_down(3)
 
     def _write(self, data: bytes):
+        self._reset_cursor_blink()
         if self._pty:
             self._pty.write(data)
         elif self._serial:
             self._serial.write(data)
+
+    def _blink_cursor(self):
+        self._cursor_visible = not self._cursor_visible
+        self.update()
+
+    def _reset_cursor_blink(self):
+        self._cursor_visible = True
+        self._cursor_blink_timer.start(500)
 
     def focusNextPrevChild(self, next: bool) -> bool:
         return False
