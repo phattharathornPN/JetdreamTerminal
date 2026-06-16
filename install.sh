@@ -54,7 +54,8 @@ Categories=System;TerminalEmulator;
 Keywords=terminal;ssh;sftp;telnet;vpn;serial;
 StartupWMClass=JetdreamTerminal
 EOF
-chmod +x "$REAL_HOME/Desktop/jetdreamterminal.desktop" 2>/dev/null && \
+chmod +x "$REAL_HOME/Desktop/jetdreamterminal.desktop" 2>/dev/null
+gio set "$REAL_HOME/Desktop/jetdreamterminal.desktop" metadata::trusted true 2>/dev/null && \
     echo "✓ Desktop shortcut created" || echo "⚠ No Desktop folder"
 
 echo ""
