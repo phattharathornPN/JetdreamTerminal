@@ -39,7 +39,7 @@ class TelnetTab(QWidget):
         log.info(f"Telnet connecting: {' '.join(cmd)}")
         self._pty.launch(cmd)
         self._connecting = False
-        QTimer.singleShot(100, self._term.setFocus)
+        self._term.setFocus()
 
     def _on_exit(self, code: int):
         log.info(f"Telnet session exited: {code}")

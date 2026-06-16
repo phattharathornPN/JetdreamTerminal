@@ -102,7 +102,7 @@ class SerialTab(QWidget):
                 self._connect_btn.setText("Disconnect")
                 self._status_label.setText(f"Connected: {port} @ {baud}")
                 self._status_label.setStyleSheet("color: #a3be8c; font-size: 11px;")
-                QTimer.singleShot(50, self._term.setFocus)
+                self._term.setFocus()
 
     def _on_disconnect(self, reason: str):
         self._connect_btn.setText("Connect")
@@ -115,7 +115,7 @@ class SerialTab(QWidget):
             self._connect_btn.setText("Connect")
             self._status_label.setText("Disconnected")
             self._status_label.setStyleSheet("color: #bf616a; font-size: 11px;")
-            QTimer.singleShot(50, self._term.setFocus)
+            self._term.setFocus()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -132,8 +132,8 @@ class SerialTab(QWidget):
                 self._connect_btn.setText("Disconnect")
                 self._status_label.setText(f"Connected: {port} @ {baud}")
                 self._status_label.setStyleSheet("color: #a3be8c; padding: 4px;")
+                self._term.setFocus()
         self._connecting = False
-        QTimer.singleShot(100, self._term.setFocus)
 
     def disconnect(self):
         if self._serial:

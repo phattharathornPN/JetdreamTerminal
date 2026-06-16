@@ -132,7 +132,7 @@ class VpnTab(QWidget):
         self._connected = True
         self._connect_btn.setText("🔴 Disconnect")
         self._connect_btn.setStyleSheet("background: #bf616a; color: white;")
-        QTimer.singleShot(100, self._term.setFocus)
+        self._term.setFocus()
 
     def _disconnect_vpn(self):
         if self._connected and self._pty.is_running():

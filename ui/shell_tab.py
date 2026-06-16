@@ -60,7 +60,7 @@ class ShellTab(QWidget):
         log.info(f"Shell launching: {shell}")
         self._pty.launch([shell], os.environ.copy())
         self._connecting = False
-        QTimer.singleShot(100, self._term.setFocus)
+        self._term.setFocus()
 
     def _on_exit(self, code: int):
         log.info(f"Shell exited: {code}")

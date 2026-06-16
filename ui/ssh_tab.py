@@ -119,7 +119,7 @@ class SSHTab(QWidget):
         log.info(f"Connecting: {' '.join(cmd[:6])}...")
         self._pty.launch(cmd, env if env else None)
         self._connecting = False
-        QTimer.singleShot(100, self._term.setFocus)
+        self._term.setFocus()
 
     def _show_overlay(self, msg: str):
         if self._overlay:
