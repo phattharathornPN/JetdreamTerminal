@@ -18,7 +18,7 @@ Or use `./launch.sh` (activates venv automatically).
 
 - **Python packages** (in `.venv`): `PyQt6`, `paramiko`, `cryptography`, `pyte`, `pyserial`
 - **System packages** (must be installed separately): `libxcb-cursor0`, `sshpass`, `freerdp2-x11`
-- `install.sh` does `sudo ln -sf` for the launch script — don't run without understanding it creates symlinks.
+- `install.sh` auto-creates `.venv` + installs packages + sets up desktop entry. No hardcoded paths — safe to clone anywhere.
 
 ## Architecture
 
@@ -44,6 +44,11 @@ Or use `./launch.sh` (activates venv automatically).
 - **Thai text**: `ThaiScreen.draw()` merges combining marks (Unicode category "M") into the previous cell. If you touch terminal rendering, preserve this logic.
 - **Cursor rendering**: Cursor position must use screen-relative coordinates (`cursor.y - top`), not raw `cursor.y` (buffer row). Buffer row grows with output → cursor drawn off-screen. See `terminal_widget.py` paintEvent cursor block.
 - **Key file optional**: SSH sessions can omit key_path — SSH uses default key after `ssh-copy-id`. Don't make key_path required.
+- **Host key verification**: `ssh-keyscan` must receive legacy flags (`KexAlgorithms`, `HostKeyAlgorithms`) for Cisco/Aruba devices. Dialog shows SHA256 fingerprints. Legacy devices that fail keyscan skip the dialog and connect directly.
+- **Key filename**: Colons (`:`) in key filenames break `ssh-copy-id`. `keygen_dialog.py` rejects `:*?` in filenames.
+- **ssh-copy-id flags**: Must pass `-o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no` for legacy devices that reject pubkey auth on first connect.
+- **Desktop shortcut**: Ubuntu/GNOME requires `gio set metadata::trusted true` on `.desktop` files — `install.sh` handles this.
+- **Symlink resolution**: `launch.sh` uses `readlink -f` to resolve symlinks. Without it, `cd $(dirname "$0")` lands in `/usr/local/bin/` instead of the app dir.
 
 ## No lint/test/format
 
