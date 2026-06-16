@@ -119,9 +119,9 @@ class KeygenDialog(QDialog):
         self._key_file.setPlaceholderText(default_path)
 
     def _generate_key(self):
-        type_map = {0: ("ed25519", "ed25519"), 1: ("rsa", "rsa -b 4096"), 2: ("ecdsa", "ecdsa")}
+        type_map = {0: ("ed25519", ["-t", "ed25519"]), 1: ("rsa", ["-t", "rsa", "-b", "4096"]), 2: ("ecdsa", ["-t", "ecdsa"])}
         idx = self._key_type.currentIndex()
-        key_type, key_args = type_map.get(idx, ("ed25519", "ed25519"))
+        key_type, key_args = type_map.get(idx, ("ed25519", ["-t", "ed25519"]))
         comment = self._key_comment.text().strip()
         key_file = self._key_file.text().strip() or os.path.expanduser(f"~/.ssh/id_{key_type}")
 
@@ -142,7 +142,7 @@ class KeygenDialog(QDialog):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
-        cmd = ["ssh-keygen"] + key_args.split() + ["-f", key_file, "-N", ""]
+        cmd = ["ssh-keygen"] + key_args + ["-f", key_file, "-N", ""]
         if comment:
             cmd += ["-C", comment]
 
