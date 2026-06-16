@@ -129,10 +129,14 @@ class TerminalWidget(QWidget):
                     continue
             else:
                 return
+        cursor_before = self._screen.cursor.y if self._screen.cursor else 0
         try:
             self._stream.feed(text)
         except Exception as e:
             log.error(f"pyte feed error: {e}")
+        cursor_after = self._screen.cursor.y if self._screen.cursor else 0
+        if self._scroll_off > 0:
+            self._scroll_off += cursor_after - cursor_before
         self.update()
 
     def _get_top_row(self) -> int:
