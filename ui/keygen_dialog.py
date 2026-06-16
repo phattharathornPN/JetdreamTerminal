@@ -2,7 +2,7 @@ import os
 import subprocess
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLineEdit, QPushButton, QLabel, QTextEdit, QFileDialog,
+    QLineEdit, QComboBox, QPushButton, QLabel, QTextEdit, QFileDialog,
     QMessageBox, QGroupBox,
 )
 from PyQt6.QtCore import Qt
@@ -24,7 +24,9 @@ class KeygenDialog(QDialog):
         gen_group = QGroupBox("Generate New Key Pair")
         gen_layout = QFormLayout()
 
-        self._key_type = QLineEdit("ed25519")
+        self._key_type = QComboBox()
+        self._key_type.addItems(["ed25519", "rsa-4096", "ecdsa"])
+        self._key_type.currentIndexChanged.connect(self._on_key_type_changed)
         gen_layout.addRow("Key type:", self._key_type)
 
         self._key_comment = QLineEdit()
@@ -110,8 +112,16 @@ class KeygenDialog(QDialog):
         if path:
             self._push_key.setText(path)
 
+    def _on_key_type_changed(self):
+        type_map = {0: "ed25519", 1: "rsa", 2: "ecdsa"}
+        key_type = type_map.get(self._key_type.currentIndex(), "ed25519")
+        default_path = os.path.expanduser(f"~/.ssh/id_{key_type}")
+        self._key_file.setPlaceholderText(default_path)
+
     def _generate_key(self):
-        key_type = self._key_type.text().strip() or "ed25519"
+        type_map = {0: ("ed25519", "ed25519"), 1: ("rsa", "rsa -b 4096"), 2: ("ecdsa", "ecdsa")}
+        idx = self._key_type.currentIndex()
+        key_type, key_args = type_map.get(idx, ("ed25519", "ed25519"))
         comment = self._key_comment.text().strip()
         key_file = self._key_file.text().strip() or os.path.expanduser(f"~/.ssh/id_{key_type}")
 
@@ -132,7 +142,7 @@ class KeygenDialog(QDialog):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
-        cmd = ["ssh-keygen", "-t", key_type, "-f", key_file, "-N", ""]
+        cmd = ["ssh-keygen"] + key_args.split() + ["-f", key_file, "-N", ""]
         if comment:
             cmd += ["-C", comment]
 
