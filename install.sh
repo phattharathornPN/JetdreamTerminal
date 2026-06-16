@@ -8,6 +8,39 @@ REAL_HOME=$(eval echo "~$REAL_USER")
 
 echo "=== Installing JetdreamTerminal ==="
 
+# Install system dependencies if missing
+echo "Checking system dependencies..."
+APT_PKGS=()
+for pkg in libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
+           libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+           libxkbcommon-x11-0 sshpass tigervnc-viewer; do
+    if ! dpkg -s "$pkg" &>/dev/null; then
+        APT_PKGS+=("$pkg")
+    fi
+done
+
+# Detect freerdp version (freerdp2-x11 on 22.04, freerdp3-x11 on 24.04+)
+if dpkg -s freerdp3-x11 &>/dev/null 2>&1; then
+    :  # already installed
+elif dpkg -s freerdp2-x11 &>/dev/null 2>&1; then
+    :  # already installed
+else
+    if apt-cache show freerdp3-x11 &>/dev/null 2>&1; then
+        APT_PKGS+=(freerdp3-x11)
+    elif apt-cache show freerdp2-x11 &>/dev/null 2>&1; then
+        APT_PKGS+=(freerdp2-x11)
+    fi
+fi
+
+if [ ${#APT_PKGS[@]} -gt 0 ]; then
+    echo "Installing: ${APT_PKGS[*]}"
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq "${APT_PKGS[@]}"
+    echo "✓ System dependencies installed"
+else
+    echo "✓ All system dependencies present"
+fi
+
 # Setup venv if missing
 if [ ! -d "$APPDIR/.venv" ]; then
     echo "Creating virtual environment..."

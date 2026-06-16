@@ -66,15 +66,22 @@ pyserial>=3.5
 ### System packages
 
 ```bash
-sudo apt install libxcb-cursor0 sshpass freerdp2-x11 tigervnc-viewer
+sudo apt install python3-venv libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 \
+    libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+    libxkbcommon-x11-0 sshpass freerdp2-x11 tigervnc-viewer
 ```
+
+> Ubuntu 24.04+: ใช้ `freerdp3-x11` แทน `freerdp2-x11`
+> `install.sh` จะ detect version ให้อัตโนมัติ
 
 ## Installation
 
 ### Prerequisites
 
 ```bash
-sudo apt install python3-venv libxcb-cursor0 sshpass freerdp2-x11 tigervnc-viewer
+sudo apt install python3-venv libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 \
+    libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+    libxkbcommon-x11-0 sshpass freerdp2-x11 tigervnc-viewer
 ```
 
 ### Install as Application (Recommended)

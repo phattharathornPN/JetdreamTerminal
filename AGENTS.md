@@ -17,8 +17,8 @@ Or use `./launch.sh` (activates venv automatically).
 ## Dependencies
 
 - **Python packages** (in `.venv`): `PyQt6`, `paramiko`, `cryptography`, `pyte`, `pyserial`
-- **System packages** (must be installed separately): `libxcb-cursor0`, `sshpass`, `freerdp2-x11`, `tigervnc-viewer`
-- `install.sh` auto-creates `.venv` + installs packages + sets up desktop entry. No hardcoded paths — safe to clone anywhere.
+- **System packages** (must be installed separately): `libxcb-cursor0`, `libxcb-xinerama0`, `libxcb-icccm4`, `libxcb-image0`, `libxcb-keysyms1`, `libxcb-render-util0`, `libxcb-shape0`, `libxkbcommon-x11-0`, `sshpass`, `freerdp2-x11` (Ubuntu 22.04) or `freerdp3-x11` (Ubuntu 24.04+), `tigervnc-viewer`
+- `install.sh` auto-detects freerdp version and installs all missing system packages. No hardcoded paths — safe to clone anywhere.
 
 ## Architecture
 
