@@ -42,6 +42,7 @@ Or use `./launch.sh` (activates venv automatically).
 - **DB migration**: `init_db()` runs ALTER TABLE for new columns. Don't add columns without adding migration logic in `utils/db.py:init_db()`.
 - **Session type rename**: Old type "console" is migrated to "serial" on startup. Don't reintroduce "console" as a session type.
 - **Thai text**: `ThaiScreen.draw()` merges combining marks (Unicode category "M") into the previous cell. If you touch terminal rendering, preserve this logic.
+- **Cursor rendering**: Cursor position must use screen-relative coordinates (`cursor.y - top`), not raw `cursor.y` (buffer row). Buffer row grows with output → cursor drawn off-screen. See `terminal_widget.py` paintEvent cursor block.
 - **Key file optional**: SSH sessions can omit key_path — SSH uses default key after `ssh-copy-id`. Don't make key_path required.
 
 ## No lint/test/format
