@@ -39,7 +39,9 @@ Or use `./launch.sh` (activates venv automatically).
 
 ## Gotchas
 
-- **paramiko SFTP**: Uses `paramiko.Transport` directly, not `SSHClient`. paramiko 5.0.0 has a "No existing session" bug with SSHClient. Don't refactor to SSHClient without testing.
+- **paramiko SFTP**: Uses `paramiko.Transport` directly, not `SSHClient`. paramiko 5.0.0 has a "No existing session" bug with SSHClient. Don't refactor to SSHClient without testing. SFTP auto-scans `~/.ssh/` for private keys when session has no key_path. Auto-strips `.pub` extension from key_path if private key exists.
+- **Key generation**: `keygen_dialog.py` uses dropdown (ed25519/rsa-4096/ecdsa). Some servers (VMware ESXi, old Cisco) don't support Ed25519 — must use RSA. RSA fallback auto-generates if push fails.
+- **ssh-copy-id**: After push, verifies key auth with `_verify_key_auth()`. If key doesn't work, auto-retries with RSA-4096. Detects server's `AuthorizedKeysFile` via `sshd -T`, `grep sshd_config`, or common paths (`/etc/ssh/keys-%u/`). Uses `-o IdentitiesOnly=yes` to prevent agent key conflicts.
 - **Legacy SSH mode**: Extra `-o` flags for Cisco/Aruba older devices (including `PubkeyAcceptedAlgorithms=+ssh-rsa`). This is critical for the user's network work — don't simplify these flags.
 - **DB migration**: `init_db()` runs ALTER TABLE for new columns (currently: `serial_port`, `baudrate`, `favorite`, `auto_save`, `vpn_realm`, `vpn_trusted_cert`, `vpn_ignore_cert`, `vnc_port`). Don't add columns without adding migration logic in `utils/db.py:init_db()`.
 - **Session type rename**: Old type "console" is migrated to "serial" on startup. Don't reintroduce "console" as a session type.

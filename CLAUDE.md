@@ -209,3 +209,7 @@ Terminal sets `TERM=xterm-256color`.
 - Key file = optional เพราะ SSH ใช้ default key หลัง ssh-copy-id แล้ว
 - VNC password file ต้องเป็น binary format (XOR) ไม่ใช่ plain text
 - **Alternate screen buffer**: pyte 0.8.2 ไม่รองรับ DECSET/DECRST 1049 — `ThaiScreen` override `set_mode`/`reset_mode` เพื่อ save/restore buffer + cursor ตอนเข้า/ออกจาก alternate screen. ถ้าไม่มี override นี้ `htop` และ `systemctl status` จะทำลาย scrollback buffer ตอนออกจาก program. ห้ามลบ `_saved_alt_buffer`/`_saved_alt_cursor`
+- **SFTP auth**: รองรับทุก AuthType (password, key, key+password). Auto-scan `~/.ssh/` หา private key ถ้า session ไม่มี key_path. Auto-strip `.pub` extension
+- **Key generation**: dropdown (ed25519/rsa-4096/ecdsa). Server เก่า (ESXi, Cisco) ไม่รองรับ Ed25519 — ต้องใช้ RSA
+- **ssh-copy-id**: หลัง push ตรวจ key auth จริงด้วย `_verify_key_auth()`. ถ้า fail auto-retry RSA. Detect `AuthorizedKeysFile` ผ่าน `sshd -T`, `grep sshd_config`, หรือ check path ที่พบบ่อย (`/etc/ssh/keys-%u/`)
+- **Session dialog**: Password field ว่าง = ล้าง password เสมอ (ไม่ใช่เก่าค้าง). Port ไม่ reset เมื่อ edit mode
