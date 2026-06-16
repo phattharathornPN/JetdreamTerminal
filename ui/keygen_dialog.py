@@ -168,22 +168,45 @@ class KeygenDialog(QDialog):
         env = os.environ.copy()
         if password:
             env["SSHPASS"] = password
+        ssh_opts = ["-o", "StrictHostKeyChecking=accept-new",
+                    "-o", "PreferredAuthentications=password,keyboard-interactive"]
+
+        # Method 1: sshd -T
         try:
-            auth_cmd = (
-                "sshd -T 2>/dev/null | grep -i authorizedkeysfile | awk '{print $2}'"
-            )
-            cmd = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-                   "-o", "PreferredAuthentications=password,keyboard-interactive",
-                   f"{user}@{host}", auth_cmd]
-            if password:
-                cmd = ["sshpass", "-e"] + cmd
+            cmd = (["sshpass", "-e"] if password else []) + \
+                  ["ssh"] + ssh_opts + [f"{user}@{host}",
+                  "sshd -T 2>/dev/null | grep -i authorizedkeysfile | awk '{print $2}'"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
             path = result.stdout.strip()
             if path:
-                path = path.replace("%u", user).replace("~", f"/home/{user}")
+                return path.replace("%u", user).replace("~", f"/home/{user}")
+        except Exception:
+            pass
+
+        # Method 2: grep sshd_config directly
+        try:
+            cmd = (["sshpass", "-e"] if password else []) + \
+                  ["ssh"] + ssh_opts + [f"{user}@{host}",
+                  "grep -i '^AuthorizedKeysFile' /etc/ssh/sshd_config 2>/dev/null | tail -1 | awk '{print $2}'"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+            path = result.stdout.strip()
+            if path:
+                return path.replace("%u", user).replace("~", f"/home/{user}")
+        except Exception:
+            pass
+
+        # Method 3: check common alternative paths
+        try:
+            cmd = (["sshpass", "-e"] if password else []) + \
+                  ["ssh"] + ssh_opts + [f"{user}@{host}",
+                  f"test -d /etc/ssh/keys-{user} && echo /etc/ssh/keys-{user}/authorized_keys"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+            path = result.stdout.strip()
+            if path and path.startswith("/"):
                 return path
         except Exception:
             pass
+
         return None
 
     def _fix_authorized_keys_location(self, user, host, password, pub_key_path):
