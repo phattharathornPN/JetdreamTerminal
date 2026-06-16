@@ -121,7 +121,6 @@ class TerminalWidget(QWidget):
 
     def _on_data(self, data: bytes):
         self._byte_buffer += data
-        self._reset_cursor_blink()
         try:
             text = self._byte_buffer.decode('utf-8')
             self._byte_buffer = b""
@@ -392,18 +391,21 @@ class TerminalWidget(QWidget):
         if at_bottom and self._cursor_visible:
             cursor = self._screen.cursor
             if cursor and not self._selecting:
-                cur_in_sel = has_sel and sy <= cursor.y <= ey if has_sel else False
-                if not cur_in_sel:
-                    painter.setPen(QPen(self._default_fg))
-                    cx = self._margin_x + cursor.x * self._cell_w
-                    cy = self._margin_y + cursor.y * self._cell_h
-                    painter.fillRect(cx, cy, self._cell_w, self._cell_h, QColor(self._default_fg))
-                    if cursor.x < self._cols:
-                        row = self._screen.buffer.get(cursor.y, {})
-                        cell = row.get(cursor.x)
-                        if cell and cell.data:
-                            painter.setPen(QPen(self._default_bg))
-                            painter.drawText(cx, cy + self._fm.ascent(), cell.data)
+                top = self._get_top_row() - self._scroll_off
+                screen_y = cursor.y - top
+                if 0 <= screen_y < self._vis_rows:
+                    cur_in_sel = has_sel and sy <= cursor.y <= ey if has_sel else False
+                    if not cur_in_sel:
+                        painter.setPen(QPen(self._default_fg))
+                        cx = self._margin_x + cursor.x * self._cell_w
+                        cy = self._margin_y + screen_y * self._cell_h
+                        painter.fillRect(cx, cy, self._cell_w, self._cell_h, QColor(self._default_fg))
+                        if cursor.x < self._cols:
+                            row = self._screen.buffer.get(cursor.y, {})
+                            cell = row.get(cursor.x)
+                            if cell and cell.data:
+                                painter.setPen(QPen(self._default_bg))
+                                painter.drawText(cx, cy + self._fm.ascent(), cell.data)
 
         self._draw_scrollbar(painter)
         self._draw_scroll_indicator(painter)
@@ -575,7 +577,8 @@ class TerminalWidget(QWidget):
             self._scroll_down(3)
 
     def _write(self, data: bytes):
-        self._reset_cursor_blink()
+        self._cursor_visible = True
+        self._cursor_blink_timer.start(500)
         if self._pty:
             self._pty.write(data)
         elif self._serial:
@@ -584,10 +587,6 @@ class TerminalWidget(QWidget):
     def _blink_cursor(self):
         self._cursor_visible = not self._cursor_visible
         self.update()
-
-    def _reset_cursor_blink(self):
-        self._cursor_visible = True
-        self._cursor_blink_timer.start(500)
 
     def focusNextPrevChild(self, next: bool) -> bool:
         return False
