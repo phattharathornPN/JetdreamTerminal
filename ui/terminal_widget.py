@@ -42,12 +42,17 @@ class ThaiScreen(pyte.Screen):
         super().__init__(*args, **kwargs)
         self._saved_alt_buffer = None
         self._saved_alt_cursor = None
+        self._alt_scrollback = []
 
     def set_mode(self, *modes, **kwargs):
         mode_list = list(modes)
         if kwargs.get("private"):
             mode_list = [m << 5 for m in modes]
         if _ALT_SCREEN_MODE in mode_list:
+            for y in sorted(self.buffer.keys()):
+                row = self.buffer[y]
+                cells = [row.get(x) for x in range(self.columns)]
+                self._alt_scrollback.append(cells)
             self._saved_alt_buffer = {}
             for row_y, row in self.buffer.items():
                 self._saved_alt_buffer[row_y] = dict(row)
@@ -61,6 +66,7 @@ class ThaiScreen(pyte.Screen):
         if kwargs.get("private"):
             mode_list = [m << 5 for m in modes]
         if _ALT_SCREEN_MODE in mode_list:
+            self._alt_scrollback.clear()
             if self._saved_alt_buffer is not None:
                 self.buffer.clear()
                 for row_y, row in self._saved_alt_buffer.items():
@@ -185,13 +191,20 @@ class TerminalWidget(QWidget):
 
     def _get_top_row(self) -> int:
         cursor_y = self._screen.cursor.y if self._screen.cursor else 0
-        return max(0, cursor_y - self._vis_rows + 1)
+        alt_sb = len(self._screen._alt_scrollback)
+        return max(0, cursor_y - self._vis_rows + 1 + alt_sb)
 
     def _get_display_line(self, row: int) -> list | None:
         top = self._get_top_row() - self._scroll_off
         buf_y = top + row
-        if buf_y < 0 or buf_y >= self._buf_rows:
+        alt_sb = len(self._screen._alt_scrollback)
+        if buf_y < 0:
             return None
+        if buf_y < alt_sb:
+            return self._screen._alt_scrollback[buf_y]
+        if buf_y >= self._buf_rows:
+            return None
+        buf_y -= alt_sb
         raw = self._screen.buffer.get(buf_y, {})
         return [raw.get(x) for x in range(self._screen.columns)]
 
