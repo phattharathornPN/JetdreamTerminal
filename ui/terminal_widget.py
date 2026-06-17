@@ -1,4 +1,5 @@
 import pyte
+from pyte.screens import Margins
 import os
 import unicodedata
 from datetime import datetime
@@ -43,16 +44,16 @@ class ThaiScreen(pyte.Screen):
         self._saved_alt_buffer = None
         self._saved_alt_cursor = None
         self._alt_scrollback = []
+        self._in_alt_screen = False
+        self._max_scrollback = 5000
 
     def set_mode(self, *modes, **kwargs):
         mode_list = list(modes)
         if kwargs.get("private"):
             mode_list = [m << 5 for m in modes]
         if _ALT_SCREEN_MODE in mode_list:
-            for y in sorted(self.buffer.keys()):
-                row = self.buffer[y]
-                cells = [row.get(x) for x in range(self.columns)]
-                self._alt_scrollback.append(cells)
+            self._in_alt_screen = True
+            self._alt_scrollback.clear()
             self._saved_alt_buffer = {}
             for row_y, row in self.buffer.items():
                 self._saved_alt_buffer[row_y] = dict(row)
@@ -66,6 +67,7 @@ class ThaiScreen(pyte.Screen):
         if kwargs.get("private"):
             mode_list = [m << 5 for m in modes]
         if _ALT_SCREEN_MODE in mode_list:
+            self._in_alt_screen = False
             self._alt_scrollback.clear()
             if self._saved_alt_buffer is not None:
                 self.buffer.clear()
@@ -79,6 +81,17 @@ class ThaiScreen(pyte.Screen):
                 self.cursor.hidden = self._saved_alt_cursor[2]
                 self._saved_alt_cursor = None
         super().reset_mode(*modes, **kwargs)
+
+    def index(self):
+        if self._in_alt_screen:
+            top, bottom = self.margins or Margins(0, self.lines - 1)
+            if self.cursor.y == bottom:
+                row = self.buffer.get(top)
+                if row is not None:
+                    self._alt_scrollback.append([row.get(x) for x in range(self.columns)])
+                    if len(self._alt_scrollback) > self._max_scrollback:
+                        del self._alt_scrollback[0]
+        super().index()
 
     def draw(self, char: str):
         for ch in char:
@@ -179,14 +192,14 @@ class TerminalWidget(QWidget):
                     continue
             else:
                 return
-        cursor_before = self._screen.cursor.y if self._screen.cursor else 0
+        total_before = (self._screen.cursor.y if self._screen.cursor else 0) + len(self._screen._alt_scrollback)
         try:
             self._stream.feed(text)
         except Exception as e:
             log.error(f"pyte feed error: {e}")
-        cursor_after = self._screen.cursor.y if self._screen.cursor else 0
+        total_after = (self._screen.cursor.y if self._screen.cursor else 0) + len(self._screen._alt_scrollback)
         if self._scroll_off > 0:
-            self._scroll_off += cursor_after - cursor_before
+            self._scroll_off += total_after - total_before
         self.update()
 
     def _get_top_row(self) -> int:
@@ -626,12 +639,43 @@ class TerminalWidget(QWidget):
             self._sel_end = None
         self.update()
 
+    def _mouse_tracking_modes(self):
+        mode = self._screen.mode
+        reporting = any((m << 5) in mode for m in (1000, 1002, 1003))
+        sgr = (1006 << 5) in mode
+        return reporting, sgr
+
+    def _send_mouse_wheel(self, event: QWheelEvent, delta: int, sgr: bool):
+        if not self._pty and not self._serial:
+            return
+        pos = event.position().toPoint()
+        cell = self._cell_from_pos(pos)
+        col, row = cell.x() + 1, cell.y() + 1
+        button = 64 if delta > 0 else 65
+        notches = max(1, abs(delta) // 120)
+        if sgr:
+            seq = f"\x1b[<{button};{col};{row}M".encode()
+        else:
+            seq = bytes([0x1b, ord('['), ord('M'), button + 32,
+                         min(col, 223) + 32, min(row, 223) + 32])
+        data = seq * notches
+        if self._pty:
+            self._pty.write(data)
+        elif self._serial:
+            self._serial.write(data)
+
     def wheelEvent(self, event: QWheelEvent):
         delta = event.angleDelta().y()
+        reporting, sgr = self._mouse_tracking_modes()
+        if reporting and delta != 0:
+            self._send_mouse_wheel(event, delta, sgr)
+            event.accept()
+            return
         if delta > 0:
             self._scroll_up(3)
         elif delta < 0:
             self._scroll_down(3)
+        event.accept()
 
     def _write(self, data: bytes):
         self._cursor_visible = True
