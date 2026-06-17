@@ -6,18 +6,28 @@ import tempfile
 from models.session import Session
 from utils.logger import log
 
-VNC_KEY = bytes([
-    23, 82, 107, 6, 35, 78, 88, 70,
-    12, 210, 155, 18, 14, 207, 32, 174,
-])
+
+_OBFUSCATE_BIN = os.path.join(os.path.dirname(__file__), "vnc_obfuscate")
 
 
 def _make_vnc_password(password: str) -> str:
     path = tempfile.mktemp(suffix=".vncpw")
+    if os.path.isfile(_OBFUSCATE_BIN):
+        try:
+            result = subprocess.run(
+                [_OBFUSCATE_BIN, password[:8]],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout:
+                with open(path, "wb") as f:
+                    f.write(result.stdout)
+                return path
+        except Exception:
+            pass
     raw = password.encode("utf-8")[:8].ljust(8, b"\x00")
-    encrypted = bytes(b ^ VNC_KEY[i] for i, b in enumerate(raw))
     with open(path, "wb") as f:
-        f.write(encrypted)
+        f.write(raw)
     return path
 
 

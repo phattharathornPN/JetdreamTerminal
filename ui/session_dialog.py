@@ -207,8 +207,8 @@ class SessionDialog(QDialog):
         self._username_label.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
         self._auth.setVisible(is_network and not is_serial and not is_rdp and not is_vpn and not is_vnc)
         self._auth_label.setVisible(is_network and not is_serial and not is_rdp and not is_vpn and not is_vnc)
-        self._password.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
-        self._password_label.setVisible(is_network and not is_serial and not is_vpn and not is_vnc)
+        self._password.setVisible(is_network and not is_serial and not is_vpn)
+        self._password_label.setVisible(is_network and not is_serial and not is_vpn)
         self._serial_port_widget.setVisible(is_serial)
         self._serial_port_label.setVisible(is_serial)
         self._baudrate.setVisible(is_serial)
@@ -349,6 +349,8 @@ class SessionDialog(QDialog):
         pw = self._password.text()
         if pw:
             self.session.password_encrypted = encrypt(pw)
+        elif not self._password.isVisible():
+            pass
         else:
             self.session.password_encrypted = b""
 
