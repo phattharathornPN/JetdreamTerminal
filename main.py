@@ -10,7 +10,7 @@ from utils.logger import log
 from ui.main_window import MainWindow
 from ui.theme import load_saved_theme
 
-ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
 
 
 def main():

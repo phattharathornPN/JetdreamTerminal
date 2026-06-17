@@ -64,7 +64,7 @@ Name=JetdreamTerminal
 GenericName=Terminal Client
 Comment=MobaXterm-like terminal for Linux (SSH, Telnet, SFTP, VPN, Serial, RDP)
 Exec=$APPDIR/launch.sh
-Icon=$ICON_FILE
+Icon=$APPDIR/assets/icon.png
 Terminal=false
 Categories=System;TerminalEmulator;
 Keywords=terminal;ssh;sftp;telnet;vpn;serial;
@@ -75,6 +75,10 @@ echo "✓ Desktop entry installed"
 # Install icon
 mkdir -p "$REAL_HOME/.local/share/icons/hicolor/scalable/apps"
 cp "$ICON_FILE" "$REAL_HOME/.local/share/icons/hicolor/scalable/apps/jetdreamterminal.svg"
+if [ -f "$APPDIR/assets/icon.png" ]; then
+    mkdir -p "$REAL_HOME/.local/share/icons/hicolor/256x256/apps"
+    cp "$APPDIR/assets/icon.png" "$REAL_HOME/.local/share/icons/hicolor/256x256/apps/jetdreamterminal.png"
+fi
 gtk-update-icon-cache "$REAL_HOME/.local/share/icons/hicolor/" 2>/dev/null || true
 echo "✓ Icon installed"
 
@@ -92,7 +96,7 @@ Name=JetdreamTerminal
 GenericName=Terminal Client
 Comment=MobaXterm-like terminal for Linux (SSH, Telnet, SFTP, VPN, Serial, RDP)
 Exec=$APPDIR/launch.sh
-Icon=$ICON_FILE
+Icon=$APPDIR/assets/icon.png
 Terminal=false
 Categories=System;TerminalEmulator;
 Keywords=terminal;ssh;sftp;telnet;vpn;serial;
