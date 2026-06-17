@@ -47,12 +47,15 @@ JetdreamTerminal/
 │   ├── pty_manager.py        ← PTY fork, QSocketNotifier, resize
 │   ├── ssh_client.py         ← SSH command builder (standard + legacy + Windows detect)
 │   ├── rdp_client.py         ← xfreerdp subprocess wrapper
-│   ├── vnc_client.py         ← vncviewer/remmina subprocess wrapper
+│   ├── vnc_client.py         ← vncviewer/remmina subprocess wrapper + d3des password obfuscation
 │   ├── serial_client.py      ← pyserial + QTimer polling
 │   ├── sftp_browser.py       ← paramiko Transport SFTP (Windows path support)
 │   ├── crypto.py             ← Fernet encrypt/decrypt
 │   ├── session_manager.py    ← SQLite CRUD
-│   └── host_key.py           ← ssh-keyscan + TOFU
+│   ├── host_key.py           ← ssh-keyscan + TOFU
+│   ├── d3des.c               ← TigerVNC DES implementation (for VNC password obfuscation)
+│   ├── d3des.h               ← d3des header
+│   └── vnc_obfuscate          ← Compiled binary: plaintext → d3des obfuscated password
 ├── ui/
 │   ├── main_window.py        ← MainWindow, sidebar, tabs, menus
 │   ├── terminal_widget.py    ← pyte + QPainter + scroll + selection + bg image
@@ -175,7 +178,8 @@ Terminal sets `TERM=xterm-256color`.
 1. User enters host + port in VNC tab
 2. `VncClient.launch()` finds vncviewer/remmina
 3. TigerVNC uses `host::port` (double colon) for explicit port
-4. Password file uses binary XOR encoding (8 bytes)
+4. Password file uses **d3des obfuscation** (compiled `core/vnc_obfuscate` binary)
+5. TigerVNC server reads password from `~/.config/tigervnc/passwd`
 
 ### SFTP (paramiko Transport)
 1. ใช้ `paramiko.Transport` ตรง (ไม่ผ่าน SSHClient)
@@ -207,9 +211,10 @@ Terminal sets `TERM=xterm-256color`.
 - Session type เดิม "console" → migrate เป็น "serial"
 - Legacy SSH mode สำคัญมากสำหรับ work ที่ DataCom
 - Key file = optional เพราะ SSH ใช้ default key หลัง ssh-copy-id แล้ว
-- VNC password file ต้องเป็น binary format (XOR) ไม่ใช่ plain text
+- VNC password file ต้องผ่าน d3des obfuscation ด้วย key `{23,82,107,6,35,78,88,7}` — ไม่ใช่ plain text หรือ XOR ง่ายๆ. ใช้ compiled binary `core/vnc_obfuscate` (built จาก TigerVNC d3des source)
+- **VNC server password location**: TigerVNC อ่านจาก `~/.config/tigervnc/passwd` ไม่ใช่ `~/.vnc/passwd`
 - **Alternate screen buffer**: pyte 0.8.2 ไม่รองรับ DECSET/DECRST 1049 — `ThaiScreen` override `set_mode`/`reset_mode` เพื่อ save/restore buffer + cursor ตอนเข้า/ออกจาก alternate screen. ถ้าไม่มี override นี้ `htop` และ `systemctl status` จะทำลาย scrollback buffer ตอนออกจาก program. ห้ามลบ `_saved_alt_buffer`/`_saved_alt_cursor`
 - **SFTP auth**: รองรับทุก AuthType (password, key, key+password). Auto-scan `~/.ssh/` หา private key ถ้า session ไม่มี key_path. Auto-strip `.pub` extension
 - **Key generation**: dropdown (ed25519/rsa-4096/ecdsa). Server เก่า (ESXi, Cisco) ไม่รองรับ Ed25519 — ต้องใช้ RSA
 - **ssh-copy-id**: หลัง push ตรวจ key auth จริงด้วย `_verify_key_auth()`. ถ้า fail auto-retry RSA. Detect `AuthorizedKeysFile` ผ่าน `sshd -T`, `grep sshd_config`, หรือ check path ที่พบบ่อย (`/etc/ssh/keys-%u/`)
-- **Session dialog**: Password field ว่าง = ล้าง password เสมอ (ไม่ใช่เก่าค้าง). Port ไม่ reset เมื่อ edit mode
+- **Session dialog**: Password field ว่าง = ล้าง password เวลา edit ยกเว้น VNC (เก็บค่าเดิม). Port ไม่ reset เมื่อ edit mode

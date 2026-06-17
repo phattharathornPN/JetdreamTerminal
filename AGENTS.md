@@ -30,7 +30,7 @@ Or use `./launch.sh` (activates venv automatically).
   - `rdp_tab.py` ↔ `core/rdp_client.py` (xfreerdp subprocess)
   - `sftp_tab.py` ↔ `core/sftp_browser.py` (paramiko Transport — **not** SSHClient)
   - `vpn_tab.py` — no separate client; runs `sudo openfortivpn` via `PtyManager`
-  - `vnc_tab.py` ↔ `core/vnc_client.py` (vncviewer/remmina subprocess)
+  - `vnc_tab.py` ↔ `core/vnc_client.py` (vncviewer/remmina subprocess + d3des password obfuscation)
   - `shell_tab.py` — no client; launches `$SHELL` via `PtyManager`
 - **Terminal rendering**: `terminal_widget.py` uses `pyte` screen buffer with custom `ThaiScreen` subclass for Thai/combining character support. Screen size = visible rows + 5000 scrollback. `ui/highlight.py` provides regex-based syntax highlighting (IPs, paths, errors, keywords). Default terminal theme is Dracula; QSS stylesheet uses Nord palette.
 - **PTY management**: `core/pty_manager.py` forks child process, uses `QSocketNotifier` for async reads.
@@ -59,8 +59,10 @@ Or use `./launch.sh` (activates venv automatically).
 - **Auto-save**: Sessions with `auto_save=True` save terminal output to `~/JetdreamTerminal-logs/` on close.
 - **Windows SSH support**: SSH to Windows hosts (OpenSSH on Windows Server / Windows 10+). `_is_windows_host()` heuristic detects non-IP hostnames (WIN-*, DESKTOP-*, DC-*, etc.). Adds `RequestTTY=yes` and `TERM=xterm-256color`.
 - **Windows SFTP**: `_resolve_path()` tries `%USERPROFILE%` → `$env:USERPROFILE` → `$HOME` with `sftp.stat()` validation. Falls back to `.` if all fail. Path separators normalized to `/`.
-- **VNC**: Uses `vncviewer` (tigervnc) as primary viewer, falls back to remmina/xtightvncviewer. TigerVNC requires `host::port` (double colon) for explicit port. Password file uses binary XOR encoding, not plain text.
-- **VNC password file**: TigerVNC `PasswordFile` format is 8 bytes XOR-encrypted with fixed key — not plain text. See `core/vnc_client.py:_make_vnc_password()`.
+- **VNC**: Uses `vncviewer` (tigervnc) as primary viewer, falls back to remmina/xtightvncviewer. TigerVNC requires `host::port` (double colon) for explicit port. Password file uses d3des obfuscation, not plain text or simple XOR.
+- **VNC password obfuscation**: TigerVNC uses **d3des** (modified DES with reversed `bytebit[]`), NOT standard DES or XOR. Key: `{23,82,107,6,35,78,88,7}` (last byte is `7`, not `70`). Compiled helper binary at `core/vnc_obfuscate` — built from `core/d3des.c` + `core/d3des.h` (TigerVNC source). If binary is missing, fallback writes raw bytes which won't work.
+- **VNC password file location**: TigerVNC server reads from `~/.config/tigervnc/passwd`, NOT `~/.vnc/passwd`. Always use `vncpasswd -f > ~/.config/tigervnc/passwd` to set password.
+- **VNC session dialog**: Password field is visible for VNC sessions. Saving with empty field preserves existing password (doesn't clear it).
 
 ## No lint/test/format
 
